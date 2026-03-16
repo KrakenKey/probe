@@ -1,0 +1,57 @@
+# KrakenKey Probe Configuration
+# All values can be overridden with environment variables (KK_PROBE_ prefix).
+# See README.md for full documentation.
+
+api:
+  # KrakenKey API base URL
+  url: "https://api.krakenkey.io"       # KK_PROBE_API_URL
+
+  # Your KrakenKey API key (required). Generate one at https://app.krakenkey.io/api-keys
+  key: ""                                # KK_PROBE_API_KEY
+
+probe:
+  # Probe ID — auto-generated on first run if left empty. Persisted in state_file.
+  id: ""                                 # KK_PROBE_ID
+
+  # Human-friendly name for this probe (shown in dashboard)
+  name: "my-probe"                       # KK_PROBE_NAME
+
+  # Deployment mode: "self-hosted" (default) or "hosted"
+  # Self-hosted: you configure endpoints below. Hosted: endpoints fetched from API.
+  mode: "self-hosted"                    # KK_PROBE_MODE
+
+  # Geographic region label (e.g., "us-east-1"). Required for hosted mode, optional for self-hosted.
+  region: ""                             # KK_PROBE_REGION
+
+  # How often to scan endpoints (Go duration). Min: 1m, Max: 24h. Default: 60m.
+  interval: "60m"                        # KK_PROBE_INTERVAL
+
+  # TLS dial timeout per endpoint. Default: 10s.
+  timeout: "10s"                         # KK_PROBE_TIMEOUT
+
+  # Path to persist probe ID across restarts
+  state_file: "/var/lib/krakenkey-probe/state.json"  # KK_PROBE_STATE_FILE
+
+# Endpoints to monitor (self-hosted mode only).
+# For env var override: KK_PROBE_ENDPOINTS="host1:port1,host2:port2"
+endpoints:
+  - host: "example.com"
+    port: 443
+    # Optional: override the SNI hostname sent during TLS handshake (defaults to host)
+    sni: ""
+
+  # - host: "internal.corp.net"
+  #   port: 8443
+  #   sni: "internal.corp.net"
+
+# Local health check server for liveness/readiness probes
+health:
+  enabled: true                          # KK_PROBE_HEALTH_ENABLED
+  port: 8080                             # KK_PROBE_HEALTH_PORT
+
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"                          # KK_PROBE_LOG_LEVEL
+
+  # Log format: json (default, structured) or text (human-readable)
+  format: "json"                         # KK_PROBE_LOG_FORMAT
