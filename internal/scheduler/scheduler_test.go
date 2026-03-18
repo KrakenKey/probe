@@ -36,7 +36,7 @@ func TestRunCycleSelfHosted(t *testing.T) {
 		}
 		if r.URL.Path == "/probes/report" {
 			var report reporter.ScanReport
-			json.NewDecoder(r.Body).Decode(&report)
+			_ = json.NewDecoder(r.Body).Decode(&report)
 			if len(report.Results) > 0 {
 				reportReceived.Store(true)
 			}
@@ -87,7 +87,7 @@ func TestRunCycleHostedMode(t *testing.T) {
 				},
 				"interval": "5m",
 			}
-			json.NewEncoder(w).Encode(cfg)
+			_ = json.NewEncoder(w).Encode(cfg)
 			return
 		}
 		if r.URL.Path == "/probes/report" {
@@ -205,11 +205,11 @@ func TestRunSetsReady(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 	})
 	mux.ServeHTTP(rec, req)
 
-	json.NewDecoder(rec.Body).Decode(&body)
+	_ = json.NewDecoder(rec.Body).Decode(&body)
 	if body["status"] != "ready" {
 		t.Errorf("expected ready status, got %q", body["status"])
 	}

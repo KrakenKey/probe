@@ -76,7 +76,7 @@ func newTestTLSServer(t *testing.T, opts ...func(*x509.Certificate)) (net.Listen
 			go func(c net.Conn) {
 				defer c.Close()
 				tlsConn := c.(*tls.Conn)
-				tlsConn.Handshake()
+				_ = tlsConn.Handshake()
 			}(conn)
 		}
 	}()
@@ -227,7 +227,7 @@ func TestScanEndpointTimeout(t *testing.T) {
 			// Hold connection open, never respond
 			go func(c net.Conn) {
 				buf := make([]byte, 1024)
-				c.Read(buf) // block until closed
+				_, _ = c.Read(buf) // block until closed
 				c.Close()
 			}(conn)
 		}

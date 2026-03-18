@@ -32,7 +32,7 @@ func TestRegisterSuccess(t *testing.T) {
 			t.Error("User-Agent is empty")
 		}
 
-		json.NewDecoder(r.Body).Decode(&received)
+		_ = json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -69,7 +69,7 @@ func TestReportSuccess(t *testing.T) {
 		if r.URL.Path != "/probes/report" {
 			t.Errorf("path = %s, want /probes/report", r.URL.Path)
 		}
-		json.NewDecoder(r.Body).Decode(&received)
+		_ = json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -116,7 +116,7 @@ func TestReportSuccess(t *testing.T) {
 func TestReport401(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"invalid key"}`))
+		_, _ = w.Write([]byte(`{"error":"invalid key"}`))
 	}))
 	defer srv.Close()
 
@@ -205,7 +205,7 @@ func TestFetchHostedConfig(t *testing.T) {
 			},
 			Interval: "5m",
 		}
-		json.NewEncoder(w).Encode(cfg)
+		_ = json.NewEncoder(w).Encode(cfg)
 	}))
 	defer srv.Close()
 
@@ -242,5 +242,5 @@ func TestUserAgent(t *testing.T) {
 	defer srv.Close()
 
 	rep := New(srv.URL, "kk_testkey", "1.2.3", "linux", "amd64")
-	rep.Register(context.Background(), ProbeInfo{})
+	_ = rep.Register(context.Background(), ProbeInfo{})
 }

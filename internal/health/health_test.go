@@ -56,7 +56,9 @@ func TestHealthzWithScanTimes(t *testing.T) {
 	s.handleHealthz(rec, req)
 
 	var status Status
-	json.NewDecoder(rec.Body).Decode(&status)
+	if err := json.NewDecoder(rec.Body).Decode(&status); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 
 	if status.LastScan != "2026-03-15T12:00:00Z" {
 		t.Errorf("lastScan = %q, want %q", status.LastScan, "2026-03-15T12:00:00Z")
@@ -79,7 +81,9 @@ func TestReadyzNotReady(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if body["status"] != "not ready" {
 		t.Errorf("status = %q, want %q", body["status"], "not ready")
 	}
@@ -99,7 +103,9 @@ func TestReadyzAfterReady(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if body["status"] != "ready" {
 		t.Errorf("status = %q, want %q", body["status"], "ready")
 	}
