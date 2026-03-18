@@ -1,0 +1,80 @@
+version: 2
+
+project_name: krakenkey-probe
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: probe
+    main: ./cmd/probe
+    binary: krakenkey-probe
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: probe
+    builds:
+      - probe
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+dockers:
+  - image_templates:
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-amd64"
+      - "ghcr.io/krakenkey/probe:latest-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{ .Version }}"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+  - image_templates:
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-arm64"
+      - "ghcr.io/krakenkey/probe:latest-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=VERSION={{ .Version }}"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/krakenkey/probe:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-amd64"
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/krakenkey/probe:{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-amd64"
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/krakenkey/probe:{{ .Major }}"
+    image_templates:
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-amd64"
+      - "ghcr.io/krakenkey/probe:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/krakenkey/probe:latest"
+    image_templates:
+      - "ghcr.io/krakenkey/probe:latest-amd64"
+      - "ghcr.io/krakenkey/probe:latest-arm64"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"

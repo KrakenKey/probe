@@ -1,0 +1,17 @@
+services:
+  krakenkey-probe:
+    image: ghcr.io/krakenkey/probe:latest
+    container_name: krakenkey-probe
+    restart: unless-stopped
+    environment:
+      KK_PROBE_API_KEY: "kk_your_api_key_here"
+      KK_PROBE_NAME: "my-probe"
+      KK_PROBE_ENDPOINTS: "example.com:443,api.example.com:443,internal.corp:8443"
+      KK_PROBE_INTERVAL: "30m"
+    volumes:
+      - probe_state:/var/lib/krakenkey-probe
+    ports:
+      - "8080:8080"
+
+volumes:
+  probe_state:
