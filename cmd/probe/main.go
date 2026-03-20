@@ -93,7 +93,9 @@ func main() {
 	if healthSrv != nil {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*1e9) // 5s
 		defer shutdownCancel()
-		healthSrv.Shutdown(shutdownCtx)
+		if err := healthSrv.Shutdown(shutdownCtx); err != nil {
+			logger.Error("health server shutdown error", "error", err)
+		}
 	}
 
 	logger.Info("krakenkey-probe stopped")

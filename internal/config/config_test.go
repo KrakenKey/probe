@@ -164,7 +164,9 @@ endpoints:
   - host: "example.com"
     port: 443
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -183,7 +185,9 @@ endpoints:
   - host: "example.com"
     port: 443
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -200,7 +204,9 @@ api:
   key: "kk_testkey"
 endpoints: []
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -221,7 +227,9 @@ endpoints:
   - host: "example.com"
     port: 443
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -242,7 +250,9 @@ endpoints:
   - host: "example.com"
     port: 443
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -261,7 +271,9 @@ endpoints:
   - host: "example.com"
     port: 0
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -282,7 +294,9 @@ endpoints:
   - host: "example.com"
     port: 443
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -301,7 +315,9 @@ probe:
   mode: "hosted"
   id: "some-uuid"
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -320,7 +336,9 @@ probe:
   mode: "hosted"
   region: "us-east-1"
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {
@@ -340,7 +358,9 @@ probe:
   id: "some-uuid"
   region: "us-east-1"
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := Load(cfgPath)
 	if err != nil {
@@ -367,7 +387,9 @@ logging:
   level: "trace"
   format: "json"
 `
-	os.WriteFile(cfgPath, []byte(yaml), 0o644)
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(cfgPath)
 	if err == nil {

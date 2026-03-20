@@ -57,7 +57,9 @@ func TestLoadOrCreateReusesExistingID(t *testing.T) {
 		RegisteredAt: "2026-01-01T00:00:00Z",
 	}
 	data, _ := json.Marshal(existing)
-	os.WriteFile(stateFile, data, 0o644)
+	if err := os.WriteFile(stateFile, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
