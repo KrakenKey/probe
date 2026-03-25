@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -22,11 +23,16 @@ var version = "dev"
 func main() {
 	cfgPath := flag.String("config", "", "path to probe.yaml config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	healthcheck := flag.Bool("healthcheck", false, "check health endpoint and exit")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("krakenkey-probe %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
+	}
+
+	if *healthcheck {
+		os.Exit(runHealthcheck())
 	}
 
 	cfg, err := config.Load(*cfgPath)
@@ -99,6 +105,18 @@ func main() {
 	}
 
 	logger.Info("krakenkey-probe stopped")
+}
+
+func runHealthcheck() int {
+	resp, err := http.Get("http://localhost:8080/healthz")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return 0
+	}
+	return 1
 }
 
 func setupLogger(level, format string) *slog.Logger {
