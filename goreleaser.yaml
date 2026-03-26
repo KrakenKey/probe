@@ -23,10 +23,12 @@ builds:
 
 archives:
   - id: probe
-    builds:
-      - probe
+    format_overrides:
+      - goos: linux
+        format: tar.gz
+      - goos: darwin
+        format: tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format: tar.gz
 
 dockers:
   - image_templates:
@@ -35,8 +37,9 @@ dockers:
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--build-arg=VERSION={{ .Version }}"
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - probe.example.yaml
     goos: linux
     goarch: amd64
   - image_templates:
@@ -45,8 +48,9 @@ dockers:
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--build-arg=VERSION={{ .Version }}"
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - probe.example.yaml
     goos: linux
     goarch: arm64
 
