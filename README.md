@@ -1,7 +1,7 @@
 # KrakenKey Probe
 
 [![CI](https://github.com/krakenkey/probe/actions/workflows/ci.yaml/badge.svg)](https://github.com/krakenkey/probe/actions/workflows/ci.yaml)
-[![Release](https://github.com/krakenkey/probe/releases/latest)](https://github.com/krakenkey/probe/releases/latest)
+[![Release](https://img.shields.io/github/v/release/KrakenKey/probe)](https://github.com/krakenkey/probe/releases/latest)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 A lightweight TLS monitoring agent that scans endpoints for certificate health and reports results to the [KrakenKey](https://krakenkey.io) platform. Run it on your own infrastructure to monitor internal and external TLS certificates from a single dashboard.
@@ -27,7 +27,7 @@ The probe is configured via a YAML file and/or environment variables. Environmen
 
 ```yaml
 api:
-  url: "https://api.krakenkey.io"       # KK_PROBE_API_URL
+  url: "https://api.krakenkey.io"        # KK_PROBE_API_URL
   key: "kk_..."                          # KK_PROBE_API_KEY (required)
 
 probe:
