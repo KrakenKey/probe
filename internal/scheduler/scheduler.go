@@ -31,6 +31,8 @@ func New(cfg *config.Config, probeID string, rep *reporter.Reporter, h *health.S
 	}
 }
 
+const configPollInterval = 60 * time.Second
+
 func (s *Scheduler) Run(ctx context.Context) {
 	s.runCycle(ctx)
 
@@ -43,18 +45,92 @@ func (s *Scheduler) Run(ctx context.Context) {
 		interval = 60 * time.Minute
 	}
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	scanTicker := time.NewTicker(interval)
+	defer scanTicker.Stop()
 
+	// For connected/hosted modes, poll config every 60s and trigger
+	// an immediate scan when the endpoint list changes.
+	if s.usesRemoteConfig() {
+		configTicker := time.NewTicker(configPollInterval)
+		defer configTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				s.logger.Info("scheduler stopping")
+				return
+			case <-scanTicker.C:
+				s.runCycle(ctx)
+			case <-configTicker.C:
+				if s.checkConfigChanged(ctx) {
+					s.logger.Info("endpoint config changed, triggering immediate scan")
+					s.runCycle(ctx)
+					scanTicker.Reset(interval)
+				}
+			}
+		}
+	}
+
+	// Standalone: just scan on interval
 	for {
 		select {
 		case <-ctx.Done():
 			s.logger.Info("scheduler stopping")
 			return
-		case <-ticker.C:
+		case <-scanTicker.C:
 			s.runCycle(ctx)
 		}
 	}
+}
+
+func (s *Scheduler) usesRemoteConfig() bool {
+	return s.cfg.Probe.Mode == "connected" || s.cfg.Probe.Mode == "hosted"
+}
+
+// checkConfigChanged fetches the latest endpoint list and returns true if it
+// differs from the cached list.
+func (s *Scheduler) checkConfigChanged(ctx context.Context) bool {
+	if s.reporter == nil {
+		return false
+	}
+
+	cfg, err := s.reporter.FetchHostedConfig(ctx, s.probeID)
+	if err != nil {
+		s.logger.Debug("config poll failed", "error", err)
+		return false
+	}
+
+	newEndpoints := make([]scanner.EndpointResult, len(cfg.Endpoints))
+	for i, ep := range cfg.Endpoints {
+		sni := ep.SNI
+		if sni == "" {
+			sni = ep.Host
+		}
+		newEndpoints[i] = scanner.EndpointResult{
+			Host: ep.Host,
+			Port: ep.Port,
+			SNI:  sni,
+		}
+	}
+
+	if endpointsEqual(cachedRemoteEndpoints, newEndpoints) {
+		return false
+	}
+
+	cachedRemoteEndpoints = newEndpoints
+	return true
+}
+
+func endpointsEqual(a, b []scanner.EndpointResult) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Host != b[i].Host || a[i].Port != b[i].Port || a[i].SNI != b[i].SNI {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Scheduler) runCycle(ctx context.Context) {
@@ -94,18 +170,22 @@ func (s *Scheduler) runCycle(ctx context.Context) {
 		}
 	}
 
-	report := reporter.ScanReport{
-		ProbeID:   s.probeID,
-		Mode:      s.cfg.Probe.Mode,
-		Region:    s.cfg.Probe.Region,
-		Timestamp: now,
-		Results:   results,
-	}
+	if s.cfg.Probe.Mode != "standalone" && s.reporter != nil {
+		report := reporter.ScanReport{
+			ProbeID:   s.probeID,
+			Mode:      s.cfg.Probe.Mode,
+			Region:    s.cfg.Probe.Region,
+			Timestamp: now,
+			Results:   results,
+		}
 
-	if err := s.reporter.Report(ctx, report); err != nil {
-		s.logger.Error("failed to send report", "error", err)
+		if err := s.reporter.Report(ctx, report); err != nil {
+			s.logger.Error("failed to send report", "error", err)
+		} else {
+			s.logger.Info("report sent", "endpoints", len(results))
+		}
 	} else {
-		s.logger.Info("report sent", "endpoints", len(results))
+		s.logger.Info("scan cycle complete (standalone, no API report)", "endpoints", len(results))
 	}
 
 	interval := s.cfg.Probe.Interval
@@ -118,29 +198,30 @@ func (s *Scheduler) runCycle(ctx context.Context) {
 }
 
 func (s *Scheduler) resolveEndpoints(ctx context.Context) []scanner.EndpointResult {
-	if s.cfg.Probe.Mode == "hosted" {
-		return s.fetchHostedEndpoints(ctx)
+	switch s.cfg.Probe.Mode {
+	case "hosted", "connected":
+		return s.fetchRemoteEndpoints(ctx)
+	default:
+		endpoints := make([]scanner.EndpointResult, len(s.cfg.Endpoints))
+		for i, ep := range s.cfg.Endpoints {
+			endpoints[i] = scanner.EndpointFromConfig(ep)
+		}
+		return endpoints
 	}
-
-	endpoints := make([]scanner.EndpointResult, len(s.cfg.Endpoints))
-	for i, ep := range s.cfg.Endpoints {
-		endpoints[i] = scanner.EndpointFromConfig(ep)
-	}
-	return endpoints
 }
 
-var cachedHostedEndpoints []scanner.EndpointResult
+var cachedRemoteEndpoints []scanner.EndpointResult
 
-func (s *Scheduler) fetchHostedEndpoints(ctx context.Context) []scanner.EndpointResult {
+func (s *Scheduler) fetchRemoteEndpoints(ctx context.Context) []scanner.EndpointResult {
 	cfg, err := s.reporter.FetchHostedConfig(ctx, s.probeID)
 	if err != nil {
-		s.logger.Error("failed to fetch hosted config, using cached endpoints", "error", err)
-		return cachedHostedEndpoints
+		s.logger.Error("failed to fetch config from API, using cached endpoints", "error", err, "mode", s.cfg.Probe.Mode)
+		return cachedRemoteEndpoints
 	}
 
 	if len(cfg.Endpoints) == 0 {
-		s.logger.Warn("hosted config returned empty endpoint list")
-		cachedHostedEndpoints = nil
+		s.logger.Warn("API config returned empty endpoint list", "mode", s.cfg.Probe.Mode)
+		cachedRemoteEndpoints = nil
 		return nil
 	}
 
@@ -157,6 +238,6 @@ func (s *Scheduler) fetchHostedEndpoints(ctx context.Context) []scanner.Endpoint
 		}
 	}
 
-	cachedHostedEndpoints = endpoints
+	cachedRemoteEndpoints = endpoints
 	return endpoints
 }

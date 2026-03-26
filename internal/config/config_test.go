@@ -17,7 +17,7 @@ api:
 
 probe:
   name: "test-probe"
-  mode: "self-hosted"
+  mode: "standalone"
   interval: "30m"
   timeout: "5s"
   state_file: "/tmp/test-state.json"
@@ -153,13 +153,11 @@ func TestEnvOnlyNoFile(t *testing.T) {
 	}
 }
 
-func TestValidationSelfHostedMissingKey(t *testing.T) {
+func TestValidationStandaloneNoApiKeyOK(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "probe.yaml")
 
 	yaml := `
-api:
-  key: ""
 endpoints:
   - host: "example.com"
     port: 443
@@ -168,40 +166,20 @@ endpoints:
 		t.Fatal(err)
 	}
 
-	_, err := Load(cfgPath)
-	if err == nil {
-		t.Fatal("expected error for missing API key")
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("expected standalone to work without API key, got: %v", err)
+	}
+	if cfg.Probe.Mode != "standalone" {
+		t.Errorf("Probe.Mode = %q, want %q", cfg.Probe.Mode, "standalone")
 	}
 }
 
-func TestValidationSelfHostedBadKeyPrefix(t *testing.T) {
+func TestValidationStandaloneNoEndpoints(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "probe.yaml")
 
 	yaml := `
-api:
-  key: "bad_prefix"
-endpoints:
-  - host: "example.com"
-    port: 443
-`
-	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err := Load(cfgPath)
-	if err == nil {
-		t.Fatal("expected error for bad key prefix")
-	}
-}
-
-func TestValidationSelfHostedNoEndpoints(t *testing.T) {
-	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "probe.yaml")
-
-	yaml := `
-api:
-  key: "kk_testkey"
 endpoints: []
 `
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
@@ -211,6 +189,27 @@ endpoints: []
 	_, err := Load(cfgPath)
 	if err == nil {
 		t.Fatal("expected error for no endpoints")
+	}
+}
+
+func TestValidationConnectedMissingKey(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "probe.yaml")
+
+	yaml := `
+api:
+  key: ""
+probe:
+  mode: "connected"
+  id: "some-uuid"
+`
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(cfgPath)
+	if err == nil {
+		t.Fatal("expected error for connected mode missing API key")
 	}
 }
 
@@ -301,6 +300,75 @@ endpoints:
 	_, err := Load(cfgPath)
 	if err == nil {
 		t.Fatal("expected error for bad mode")
+	}
+}
+
+func TestValidationConnectedValid(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "probe.yaml")
+
+	yaml := `
+api:
+  key: "kk_userkey123"
+probe:
+  mode: "connected"
+  id: "connected-uuid"
+  interval: "30m"
+`
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.Probe.Mode != "connected" {
+		t.Errorf("Probe.Mode = %q, want %q", cfg.Probe.Mode, "connected")
+	}
+}
+
+func TestValidationConnectedAutoGeneratesID(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "probe.yaml")
+
+	yaml := `
+api:
+  key: "kk_userkey123"
+probe:
+  mode: "connected"
+`
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("expected connected mode to work without probe ID, got: %v", err)
+	}
+	if cfg.Probe.Mode != "connected" {
+		t.Errorf("Probe.Mode = %q, want %q", cfg.Probe.Mode, "connected")
+	}
+}
+
+func TestValidationConnectedBadKeyPrefix(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "probe.yaml")
+
+	yaml := `
+api:
+  key: "kk_svc_servicekey"
+probe:
+  mode: "connected"
+  id: "connected-uuid"
+`
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(cfgPath)
+	if err == nil {
+		t.Fatal("expected error for connected mode with service key prefix")
 	}
 }
 

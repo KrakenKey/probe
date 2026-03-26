@@ -83,7 +83,7 @@ func defaults() *Config {
 			URL: "https://api.krakenkey.io",
 		},
 		Probe: ProbeConfig{
-			Mode:        "self-hosted",
+			Mode:        "standalone",
 			RawInterval: "60m",
 			RawTimeout:  "10s",
 			StateFile:   "/var/lib/krakenkey-probe/state.json",
@@ -186,17 +186,23 @@ func parseDurations(cfg *Config) error {
 }
 
 func validate(cfg *Config) error {
-	if cfg.API.Key == "" {
-		return fmt.Errorf("api.key is required")
-	}
-
 	switch cfg.Probe.Mode {
-	case "self-hosted":
-		if !strings.HasPrefix(cfg.API.Key, "kk_") {
-			return fmt.Errorf("api.key must start with 'kk_' for self-hosted mode")
-		}
+	case "standalone":
 		if len(cfg.Endpoints) == 0 {
-			return fmt.Errorf("at least one endpoint is required for self-hosted mode")
+			return fmt.Errorf("at least one endpoint is required for standalone mode")
+		}
+		if cfg.Probe.Interval < time.Minute {
+			return fmt.Errorf("interval must be at least 1m, got %s", cfg.Probe.Interval)
+		}
+		if cfg.Probe.Interval > 24*time.Hour {
+			return fmt.Errorf("interval must be at most 24h, got %s", cfg.Probe.Interval)
+		}
+	case "connected":
+		if cfg.API.Key == "" {
+			return fmt.Errorf("api.key is required for connected mode")
+		}
+		if !strings.HasPrefix(cfg.API.Key, "kk_") || strings.HasPrefix(cfg.API.Key, "kk_svc_") {
+			return fmt.Errorf("api.key must be a user API key (kk_ prefix, not kk_svc_) for connected mode")
 		}
 		if cfg.Probe.Interval < time.Minute {
 			return fmt.Errorf("interval must be at least 1m, got %s", cfg.Probe.Interval)
@@ -205,6 +211,9 @@ func validate(cfg *Config) error {
 			return fmt.Errorf("interval must be at most 24h, got %s", cfg.Probe.Interval)
 		}
 	case "hosted":
+		if cfg.API.Key == "" {
+			return fmt.Errorf("api.key is required for hosted mode")
+		}
 		if cfg.Probe.Region == "" {
 			return fmt.Errorf("probe.region is required for hosted mode")
 		}
@@ -212,7 +221,7 @@ func validate(cfg *Config) error {
 			return fmt.Errorf("probe.id is required for hosted mode")
 		}
 	default:
-		return fmt.Errorf("probe.mode must be 'self-hosted' or 'hosted', got %q", cfg.Probe.Mode)
+		return fmt.Errorf("probe.mode must be 'standalone', 'connected', or 'hosted', got %q", cfg.Probe.Mode)
 	}
 
 	for i, ep := range cfg.Endpoints {

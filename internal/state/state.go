@@ -16,8 +16,8 @@ type State struct {
 }
 
 // LoadOrCreate reads the probe ID from the state file. If the file does not
-// exist and the mode is self-hosted, it generates a new UUID-style ID and
-// persists it. For hosted mode the ID must already be set in config.
+// exist and the mode is standalone, it generates a new UUID-style ID and
+// persists it. For hosted/connected mode the ID must already be set in config.
 func LoadOrCreate(cfg *config.Config) (string, error) {
 	if cfg.Probe.Mode == "hosted" {
 		return cfg.Probe.ID, nil

@@ -58,25 +58,29 @@ func main() {
 		"interval", cfg.Probe.Interval.String(),
 	)
 
-	rep := reporter.New(cfg.API.URL, cfg.API.Key, version, runtime.GOOS, runtime.GOARCH)
-
-	// Register with the API
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	regInfo := reporter.ProbeInfo{
-		ProbeID: probeID,
-		Name:    cfg.Probe.Name,
-		Version: version,
-		Mode:    cfg.Probe.Mode,
-		Region:  cfg.Probe.Region,
-		OS:      runtime.GOOS,
-		Arch:    runtime.GOARCH,
-	}
-	if err := rep.Register(ctx, regInfo); err != nil {
-		logger.Warn("failed to register with API (will retry on next cycle)", "error", err)
+	var rep *reporter.Reporter
+	if cfg.Probe.Mode != "standalone" {
+		rep = reporter.New(cfg.API.URL, cfg.API.Key, version, runtime.GOOS, runtime.GOARCH)
+
+		regInfo := reporter.ProbeInfo{
+			ProbeID: probeID,
+			Name:    cfg.Probe.Name,
+			Version: version,
+			Mode:    cfg.Probe.Mode,
+			Region:  cfg.Probe.Region,
+			OS:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
+		}
+		if err := rep.Register(ctx, regInfo); err != nil {
+			logger.Warn("failed to register with API (will retry on next cycle)", "error", err)
+		} else {
+			logger.Info("registered with API")
+		}
 	} else {
-		logger.Info("registered with API")
+		logger.Info("standalone mode: no API communication")
 	}
 
 	// Start health server
