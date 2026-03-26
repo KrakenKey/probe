@@ -15,7 +15,7 @@ func TestLoadOrCreateGeneratesID(t *testing.T) {
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
-			Mode:      "self-hosted",
+			Mode:      "standalone",
 			StateFile: stateFile,
 		},
 	}
@@ -63,7 +63,7 @@ func TestLoadOrCreateReusesExistingID(t *testing.T) {
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
-			Mode:      "self-hosted",
+			Mode:      "standalone",
 			StateFile: stateFile,
 		},
 	}
@@ -82,7 +82,7 @@ func TestLoadOrCreateUsesConfigID(t *testing.T) {
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
 			ID:   "config-id-5678",
-			Mode: "self-hosted",
+			Mode: "standalone",
 		},
 	}
 

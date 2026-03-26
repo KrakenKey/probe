@@ -16,40 +16,24 @@ import (
 	"github.com/krakenkey/probe/internal/scanner"
 )
 
-func TestRunCycleSelfHosted(t *testing.T) {
+func TestRunCycleStandalone(t *testing.T) {
 	// Reset cached endpoints
-	cachedHostedEndpoints = nil
+	cachedRemoteEndpoints = nil
 
 	var reportReceived atomic.Bool
 
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// This server also acts as the scan target (TLS endpoint)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	// API mock for report
+	// API mock — standalone should NOT call this
 	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/probes/register" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
 		if r.URL.Path == "/probes/report" {
-			var report reporter.ScanReport
-			_ = json.NewDecoder(r.Body).Decode(&report)
-			if len(report.Results) > 0 {
-				reportReceived.Store(true)
-			}
-			w.WriteHeader(http.StatusOK)
-			return
+			reportReceived.Store(true)
 		}
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer apiSrv.Close()
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
-			Mode:     "self-hosted",
+			Mode:     "standalone",
 			Interval: 1 * time.Hour,
 			Timeout:  5 * time.Second,
 		},
@@ -58,23 +42,21 @@ func TestRunCycleSelfHosted(t *testing.T) {
 		},
 	}
 
-	rep := reporter.New(apiSrv.URL, "kk_test", "0.1.0", "linux", "amd64")
-	h := health.New(0, "0.1.0", "test-id", "self-hosted", "")
+	h := health.New(0, "0.1.0", "test-id", "standalone", "")
 	logger := slog.Default()
 
-	s := New(cfg, "test-id", rep, h, logger, "0.1.0")
+	// No reporter for standalone
+	s := New(cfg, "test-id", nil, h, logger, "0.1.0")
 
-	// Run a single cycle
 	s.runCycle(context.Background())
 
-	if !reportReceived.Load() {
-		// Report may have failed endpoints but should still be sent
-		t.Log("report was sent (even if endpoints failed)")
+	if reportReceived.Load() {
+		t.Error("standalone mode should not send reports to API")
 	}
 }
 
 func TestRunCycleHostedMode(t *testing.T) {
-	cachedHostedEndpoints = nil
+	cachedRemoteEndpoints = nil
 
 	var configFetched atomic.Bool
 
@@ -120,7 +102,7 @@ func TestRunCycleHostedMode(t *testing.T) {
 
 func TestRunCycleHostedCacheFallback(t *testing.T) {
 	// Pre-populate cache
-	cachedHostedEndpoints = []scanner.EndpointResult{
+	cachedRemoteEndpoints = []scanner.EndpointResult{
 		{Host: "cached.example.com", Port: 443, SNI: "cached.example.com"},
 	}
 
@@ -162,16 +144,11 @@ func TestRunCycleHostedCacheFallback(t *testing.T) {
 }
 
 func TestRunSetsReady(t *testing.T) {
-	cachedHostedEndpoints = nil
-
-	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer apiSrv.Close()
+	cachedRemoteEndpoints = nil
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
-			Mode:     "self-hosted",
+			Mode:     "standalone",
 			Interval: 1 * time.Hour,
 			Timeout:  1 * time.Second,
 		},
@@ -180,11 +157,10 @@ func TestRunSetsReady(t *testing.T) {
 		},
 	}
 
-	rep := reporter.New(apiSrv.URL, "kk_test", "0.1.0", "linux", "amd64")
-	h := health.New(0, "0.1.0", "test-id", "self-hosted", "")
+	h := health.New(0, "0.1.0", "test-id", "standalone", "")
 	logger := slog.Default()
 
-	s := New(cfg, "test-id", rep, h, logger, "0.1.0")
+	s := New(cfg, "test-id", nil, h, logger, "0.1.0")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -216,10 +192,10 @@ func TestRunSetsReady(t *testing.T) {
 }
 
 func TestResolveEndpointsSelfHosted(t *testing.T) {
-	cachedHostedEndpoints = nil
+	cachedRemoteEndpoints = nil
 
 	cfg := &config.Config{
-		Probe: config.ProbeConfig{Mode: "self-hosted"},
+		Probe: config.ProbeConfig{Mode: "standalone"},
 		Endpoints: []config.Endpoint{
 			{Host: "a.com", Port: 443},
 			{Host: "b.com", Port: 8443, SNI: "custom.b.com"},
@@ -241,16 +217,11 @@ func TestResolveEndpointsSelfHosted(t *testing.T) {
 }
 
 func TestSchedulerContextCancellation(t *testing.T) {
-	cachedHostedEndpoints = nil
-
-	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer apiSrv.Close()
+	cachedRemoteEndpoints = nil
 
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
-			Mode:     "self-hosted",
+			Mode:     "standalone",
 			Interval: 24 * time.Hour, // long interval so it blocks on ticker
 			Timeout:  1 * time.Second,
 		},
@@ -259,10 +230,9 @@ func TestSchedulerContextCancellation(t *testing.T) {
 		},
 	}
 
-	rep := reporter.New(apiSrv.URL, "kk_test", "0.1.0", "linux", "amd64")
 	logger := slog.Default()
 
-	s := New(cfg, "test-id", rep, nil, logger, "0.1.0")
+	s := New(cfg, "test-id", nil, nil, logger, "0.1.0")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})

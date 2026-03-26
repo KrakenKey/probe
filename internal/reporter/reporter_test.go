@@ -43,7 +43,7 @@ func TestRegisterSuccess(t *testing.T) {
 		ProbeID: "test-uuid",
 		Name:    "test-probe",
 		Version: "0.1.0",
-		Mode:    "self-hosted",
+		Mode:    "standalone",
 		Region:  "us-east-1",
 		OS:      "linux",
 		Arch:    "amd64",
@@ -78,7 +78,7 @@ func TestReportSuccess(t *testing.T) {
 
 	report := ScanReport{
 		ProbeID:   "test-uuid",
-		Mode:      "self-hosted",
+		Mode:      "standalone",
 		Region:    "us-east-1",
 		Timestamp: time.Now().UTC(),
 		Results: []scanner.ScanResult{

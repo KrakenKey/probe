@@ -1,0 +1,16 @@
+# Binary
+probe
+*.exe
+
+# Environment (contains API keys)
+.env
+
+# State file
+state.json
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

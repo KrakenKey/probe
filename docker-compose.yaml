@@ -1,17 +1,27 @@
 services:
+  # Standalone mode: endpoints defined in .env, results reported to API
+  # Connected mode: endpoints fetched from API, authenticated with user API key
+  #
+  # Usage:
+  #   cp .env.example .env   # edit with your values
+  #   docker compose up -d
   krakenkey-probe:
+    build: .
     image: ghcr.io/krakenkey/probe:latest
     container_name: krakenkey-probe
     restart: unless-stopped
-    environment:
-      KK_PROBE_API_KEY: "kk_your_api_key_here"
-      KK_PROBE_NAME: "my-probe"
-      KK_PROBE_ENDPOINTS: "example.com:443,api.example.com:443,internal.corp:8443"
-      KK_PROBE_INTERVAL: "30m"
+    env_file:
+      - .env
     volumes:
       - probe_state:/var/lib/krakenkey-probe
     ports:
-      - "8080:8080"
+      - "${KK_PROBE_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "/probe", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   probe_state:

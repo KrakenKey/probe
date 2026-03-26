@@ -10,7 +10,7 @@ import (
 )
 
 func TestHealthzReturnsStatus(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "us-east-1")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "us-east-1")
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
@@ -35,8 +35,8 @@ func TestHealthzReturnsStatus(t *testing.T) {
 	if status.ProbeID != "test-uuid" {
 		t.Errorf("probeId = %q, want %q", status.ProbeID, "test-uuid")
 	}
-	if status.Mode != "self-hosted" {
-		t.Errorf("mode = %q, want %q", status.Mode, "self-hosted")
+	if status.Mode != "standalone" {
+		t.Errorf("mode = %q, want %q", status.Mode, "standalone")
 	}
 	if status.Region != "us-east-1" {
 		t.Errorf("region = %q, want %q", status.Region, "us-east-1")
@@ -44,7 +44,7 @@ func TestHealthzReturnsStatus(t *testing.T) {
 }
 
 func TestHealthzWithScanTimes(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "")
 
 	last := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
 	next := time.Date(2026, 3, 15, 13, 0, 0, 0, time.UTC)
@@ -69,7 +69,7 @@ func TestHealthzWithScanTimes(t *testing.T) {
 }
 
 func TestReadyzNotReady(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
@@ -90,7 +90,7 @@ func TestReadyzNotReady(t *testing.T) {
 }
 
 func TestReadyzAfterReady(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "")
 	s.SetReady()
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
@@ -112,7 +112,7 @@ func TestReadyzAfterReady(t *testing.T) {
 }
 
 func TestServerStartAndShutdown(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "")
 
 	// Use port 0 to get a random available port
 	s.server.Addr = ":0"
@@ -138,7 +138,7 @@ func TestServerStartAndShutdown(t *testing.T) {
 }
 
 func TestContentTypeJSON(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "self-hosted", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "")
 
 	tests := []struct {
 		name    string

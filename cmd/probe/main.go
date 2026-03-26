@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -22,11 +23,16 @@ var version = "dev"
 func main() {
 	cfgPath := flag.String("config", "", "path to probe.yaml config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	healthcheck := flag.Bool("healthcheck", false, "check health endpoint and exit")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("krakenkey-probe %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
+	}
+
+	if *healthcheck {
+		os.Exit(runHealthcheck())
 	}
 
 	cfg, err := config.Load(*cfgPath)
@@ -52,25 +58,29 @@ func main() {
 		"interval", cfg.Probe.Interval.String(),
 	)
 
-	rep := reporter.New(cfg.API.URL, cfg.API.Key, version, runtime.GOOS, runtime.GOARCH)
-
-	// Register with the API
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	regInfo := reporter.ProbeInfo{
-		ProbeID: probeID,
-		Name:    cfg.Probe.Name,
-		Version: version,
-		Mode:    cfg.Probe.Mode,
-		Region:  cfg.Probe.Region,
-		OS:      runtime.GOOS,
-		Arch:    runtime.GOARCH,
-	}
-	if err := rep.Register(ctx, regInfo); err != nil {
-		logger.Warn("failed to register with API (will retry on next cycle)", "error", err)
+	var rep *reporter.Reporter
+	if cfg.Probe.Mode != "standalone" {
+		rep = reporter.New(cfg.API.URL, cfg.API.Key, version, runtime.GOOS, runtime.GOARCH)
+
+		regInfo := reporter.ProbeInfo{
+			ProbeID: probeID,
+			Name:    cfg.Probe.Name,
+			Version: version,
+			Mode:    cfg.Probe.Mode,
+			Region:  cfg.Probe.Region,
+			OS:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
+		}
+		if err := rep.Register(ctx, regInfo); err != nil {
+			logger.Warn("failed to register with API (will retry on next cycle)", "error", err)
+		} else {
+			logger.Info("registered with API")
+		}
 	} else {
-		logger.Info("registered with API")
+		logger.Info("standalone mode: no API communication")
 	}
 
 	// Start health server
@@ -99,6 +109,18 @@ func main() {
 	}
 
 	logger.Info("krakenkey-probe stopped")
+}
+
+func runHealthcheck() int {
+	resp, err := http.Get("http://localhost:8080/healthz")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return 0
+	}
+	return 1
 }
 
 func setupLogger(level, format string) *slog.Logger {
