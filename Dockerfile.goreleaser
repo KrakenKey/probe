@@ -1,0 +1,7 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY krakenkey-probe /probe
+COPY probe.example.yaml /etc/krakenkey-probe/probe.yaml
+VOLUME ["/var/lib/krakenkey-probe"]
+EXPOSE 8080
+ENTRYPOINT ["/probe"]
+CMD ["--config", "/etc/krakenkey-probe/probe.yaml"]
