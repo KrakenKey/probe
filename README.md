@@ -10,31 +10,70 @@ The probe connects to configured endpoints via TLS, extracts certificate and con
 
 ## Quick Start
 
+### Standalone (no API key needed)
+
 ```bash
 docker run -d \
-  -e KK_PROBE_API_KEY="kk_your_api_key" \
   -e KK_PROBE_ENDPOINTS="example.com:443,api.example.com:443" \
   -e KK_PROBE_NAME="my-probe" \
   -v probe_state:/var/lib/krakenkey-probe \
   ghcr.io/krakenkey/probe:latest
 ```
 
+### Connected (reports to KrakenKey)
+
+```bash
+docker run -d \
+  -e KK_PROBE_MODE="connected" \
+  -e KK_PROBE_API_KEY="kk_your_api_key" \
+  -e KK_PROBE_NAME="my-probe" \
+  -v probe_state:/var/lib/krakenkey-probe \
+  ghcr.io/krakenkey/probe:latest
+```
+
+## Operating Modes
+
+The probe supports three operating modes:
+
+| Mode | API Key | Endpoints | Description |
+|---|---|---|---|
+| `standalone` | Not required | Defined locally in config/env | Fully local. Scans endpoints and logs results to console. No API communication. |
+| `connected` | Required (`kk_` prefix) | Managed via KrakenKey dashboard | Endpoints fetched from API. Results reported to KrakenKey for dashboard monitoring. |
+| `hosted` | Required (service key) | Managed by KrakenKey | Fully managed by KrakenKey infrastructure. Probe ID, name, and region are pre-configured. |
+
+Set the mode with `KK_PROBE_MODE` or `probe.mode` in the YAML config. Default: `standalone`.
+
+## CLI Flags
+
+```
+krakenkey-probe [flags]
+
+Flags:
+  --config <path>    Path to probe.yaml config file
+  --version          Print version and exit
+  --healthcheck      Check health endpoint (http://localhost:8080/healthz) and exit with 0 (healthy) or 1 (unhealthy)
+```
+
 ## Configuration
 
-The probe is configured via a YAML file and/or environment variables. Environment variables take precedence over YAML values.
+The probe is configured via a YAML file and/or environment variables. Configuration is loaded in order of precedence (highest wins):
+
+1. **Environment variables** (`KK_PROBE_*` prefix)
+2. **YAML config file** (if `--config` is provided)
+3. **Built-in defaults**
 
 ### YAML Config
 
 ```yaml
 api:
   url: "https://api.krakenkey.io"        # KK_PROBE_API_URL
-  key: "kk_..."                          # KK_PROBE_API_KEY (required)
+  key: ""                                # KK_PROBE_API_KEY (required for connected/hosted modes)
 
 probe:
   id: ""                                 # KK_PROBE_ID (auto-generated if empty)
   name: "my-probe"                       # KK_PROBE_NAME
-  mode: "self-hosted"                    # KK_PROBE_MODE (self-hosted | hosted)
-  region: ""                             # KK_PROBE_REGION
+  mode: "standalone"                     # KK_PROBE_MODE (standalone | connected | hosted)
+  region: ""                             # KK_PROBE_REGION (required for hosted mode)
   interval: "60m"                        # KK_PROBE_INTERVAL (min: 1m, max: 24h)
   timeout: "10s"                         # KK_PROBE_TIMEOUT
   state_file: "/var/lib/krakenkey-probe/state.json"  # KK_PROBE_STATE_FILE
@@ -42,7 +81,7 @@ probe:
 endpoints:                               # KK_PROBE_ENDPOINTS (comma-separated host:port)
   - host: "example.com"
     port: 443
-    sni: ""                              # optional SNI override
+    sni: ""                              # optional: override the SNI hostname sent during TLS handshake
   - host: "internal.corp.net"
     port: 8443
 
@@ -55,20 +94,24 @@ logging:
   format: "json"                         # KK_PROBE_LOG_FORMAT (json|text)
 ```
 
+### SNI Override
+
+Use the `sni` field when the hostname you connect to differs from the hostname expected by the TLS certificate. This is common with load balancers, CDNs, or internal services behind a reverse proxy. If omitted, the `host` value is used as the SNI hostname.
+
 ### Environment Variable Reference
 
 | Variable | Default | Description |
 |---|---|---|
 | `KK_PROBE_API_URL` | `https://api.krakenkey.io` | KrakenKey API base URL |
-| `KK_PROBE_API_KEY` | (required) | API key, must start with `kk_` |
+| `KK_PROBE_API_KEY` | | API key (`kk_` prefix). Required for `connected` and `hosted` modes. |
 | `KK_PROBE_ID` | (auto-generated) | Probe ID, persisted to state file |
 | `KK_PROBE_NAME` | | Human-friendly probe name |
-| `KK_PROBE_MODE` | `self-hosted` | `self-hosted` or `hosted` |
-| `KK_PROBE_REGION` | | Geographic region label |
-| `KK_PROBE_INTERVAL` | `60m` | Scan interval (Go duration) |
+| `KK_PROBE_MODE` | `standalone` | `standalone`, `connected`, or `hosted` |
+| `KK_PROBE_REGION` | | Geographic region label (required for `hosted` mode) |
+| `KK_PROBE_INTERVAL` | `60m` | Scan interval (Go duration, e.g. `30m`, `1h`) |
 | `KK_PROBE_TIMEOUT` | `10s` | Per-endpoint TLS dial timeout |
 | `KK_PROBE_STATE_FILE` | `/var/lib/krakenkey-probe/state.json` | State file path |
-| `KK_PROBE_ENDPOINTS` | | Comma-separated `host:port` pairs |
+| `KK_PROBE_ENDPOINTS` | | Comma-separated `host:port` pairs. Port defaults to `443` if omitted. |
 | `KK_PROBE_HEALTH_ENABLED` | `true` | Enable health endpoint |
 | `KK_PROBE_HEALTH_PORT` | `8080` | Health endpoint port |
 | `KK_PROBE_LOG_LEVEL` | `info` | Log level |
@@ -83,6 +126,7 @@ services:
     container_name: krakenkey-probe
     restart: unless-stopped
     environment:
+      KK_PROBE_MODE: "connected"
       KK_PROBE_API_KEY: "kk_your_api_key_here"
       KK_PROBE_NAME: "my-probe"
       KK_PROBE_ENDPOINTS: "example.com:443,api.example.com:443"
@@ -215,11 +259,11 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o krakenkey-pr
                          GET /readyz
 ```
 
-1. On startup, the probe loads its config, generates or reads its probe ID, and registers with the KrakenKey API.
-2. It immediately runs the first scan cycle: connects to each endpoint via TLS, extracts certificate metadata, and sends results to the API.
+1. On startup, the probe loads its config and generates or reads its probe ID. In `connected`/`hosted` modes, it registers with the KrakenKey API.
+2. It immediately runs the first scan cycle: connects to each endpoint via TLS and extracts certificate metadata. In `connected`/`hosted` modes, results are sent to the API. In `standalone` mode, results are logged to the console.
 3. After the first scan, the `/readyz` endpoint returns `200 OK`.
 4. Subsequent scans run on the configured interval.
-5. On `SIGINT` or `SIGTERM`, the probe finishes the current scan cycle and shuts down.
+5. On `SIGINT` or `SIGTERM`, the probe finishes the current scan cycle and shuts down gracefully.
 
 ### What Gets Collected
 
@@ -258,16 +302,32 @@ For each endpoint, the probe extracts:
 
 ### `/healthz` Response
 
+Always returns `200 OK`:
+
 ```json
 {
   "status": "ok",
   "version": "0.1.0",
   "probeId": "a1b2c3d4-...",
-  "mode": "self-hosted",
+  "mode": "standalone",
   "region": "us-east-1",
   "lastScan": "2026-03-17T12:00:00Z",
   "nextScan": "2026-03-17T13:00:00Z"
 }
+```
+
+### `/readyz` Response
+
+Returns `503 Service Unavailable` before the first scan completes:
+
+```json
+{ "status": "not ready" }
+```
+
+Returns `200 OK` after the first scan completes:
+
+```json
+{ "status": "ready" }
 ```
 
 ## Troubleshooting
