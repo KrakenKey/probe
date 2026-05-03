@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/krakenkey/probe/internal/config"
 )
 
 type Server struct {
@@ -27,7 +29,7 @@ type Status struct {
 	NextScan string `json:"nextScan,omitempty"`
 }
 
-func New(port int, version, probeID, mode, region string) *Server {
+func New(port int, version, probeID, mode, region string, scanAPI config.ScanAPIConfig) *Server {
 	s := &Server{
 		port: port,
 		status: Status{
@@ -42,6 +44,10 @@ func New(port int, version, probeID, mode, region string) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
+
+	if scanAPI.Enabled {
+		mux.Handle("/scan", http.TimeoutHandler(newScanHandler(scanAPI.Secret), 20*time.Second, `{"error":"timeout"}`))
+	}
 
 	s.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),

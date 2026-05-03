@@ -15,6 +15,7 @@ type Config struct {
 	Probe     ProbeConfig     `yaml:"probe"`
 	Endpoints []Endpoint      `yaml:"endpoints"`
 	Health    HealthConfig    `yaml:"health"`
+	ScanAPI   ScanAPIConfig   `yaml:"scan_api"`
 	Logging   LoggingConfig   `yaml:"logging"`
 }
 
@@ -44,6 +45,11 @@ type Endpoint struct {
 type HealthConfig struct {
 	Enabled bool `yaml:"enabled"`
 	Port    int  `yaml:"port"`
+}
+
+type ScanAPIConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Secret  string `yaml:"secret"`
 }
 
 type LoggingConfig struct {
@@ -137,6 +143,12 @@ func applyEnvOverrides(cfg *Config) {
 		if port, err := strconv.Atoi(v); err == nil {
 			cfg.Health.Port = port
 		}
+	}
+	if v := os.Getenv("KK_PROBE_SCAN_API_ENABLED"); v != "" {
+		cfg.ScanAPI.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("KK_PROBE_SCAN_API_SECRET"); v != "" {
+		cfg.ScanAPI.Secret = v
 	}
 	if v := os.Getenv("KK_PROBE_LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = v
@@ -243,6 +255,10 @@ func validate(cfg *Config) error {
 	case "json", "text":
 	default:
 		return fmt.Errorf("logging.format must be json or text, got %q", cfg.Logging.Format)
+	}
+
+	if cfg.ScanAPI.Enabled && len(cfg.ScanAPI.Secret) < 32 {
+		return fmt.Errorf("scan_api.secret must be at least 32 characters when scan API is enabled")
 	}
 
 	return nil

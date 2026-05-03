@@ -86,7 +86,7 @@ func main() {
 	// Start health server
 	var healthSrv *health.Server
 	if cfg.Health.Enabled {
-		healthSrv = health.New(cfg.Health.Port, version, probeID, cfg.Probe.Mode, cfg.Probe.Region)
+		healthSrv = health.New(cfg.Health.Port, version, probeID, cfg.Probe.Mode, cfg.Probe.Region, cfg.ScanAPI)
 		go func() {
 			logger.Info("health server starting", "port", cfg.Health.Port)
 			if err := healthSrv.Start(); err != nil {
