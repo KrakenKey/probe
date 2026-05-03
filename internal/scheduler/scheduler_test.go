@@ -42,7 +42,7 @@ func TestRunCycleStandalone(t *testing.T) {
 		},
 	}
 
-	h := health.New(0, "0.1.0", "test-id", "standalone", "")
+	h := health.New(0, "0.1.0", "test-id", "standalone", "", config.ScanAPIConfig{})
 	logger := slog.Default()
 
 	// No reporter for standalone
@@ -157,7 +157,7 @@ func TestRunSetsReady(t *testing.T) {
 		},
 	}
 
-	h := health.New(0, "0.1.0", "test-id", "standalone", "")
+	h := health.New(0, "0.1.0", "test-id", "standalone", "", config.ScanAPIConfig{})
 	logger := slog.Default()
 
 	s := New(cfg, "test-id", nil, h, logger, "0.1.0")

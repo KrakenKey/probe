@@ -7,10 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/krakenkey/probe/internal/config"
 )
 
 func TestHealthzReturnsStatus(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "us-east-1")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "us-east-1", config.ScanAPIConfig{})
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
@@ -44,7 +46,7 @@ func TestHealthzReturnsStatus(t *testing.T) {
 }
 
 func TestHealthzWithScanTimes(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "", config.ScanAPIConfig{})
 
 	last := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
 	next := time.Date(2026, 3, 15, 13, 0, 0, 0, time.UTC)
@@ -69,7 +71,7 @@ func TestHealthzWithScanTimes(t *testing.T) {
 }
 
 func TestReadyzNotReady(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "", config.ScanAPIConfig{})
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
@@ -90,7 +92,7 @@ func TestReadyzNotReady(t *testing.T) {
 }
 
 func TestReadyzAfterReady(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "", config.ScanAPIConfig{})
 	s.SetReady()
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
@@ -112,7 +114,7 @@ func TestReadyzAfterReady(t *testing.T) {
 }
 
 func TestServerStartAndShutdown(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "", config.ScanAPIConfig{})
 
 	// Use port 0 to get a random available port
 	s.server.Addr = ":0"
@@ -138,7 +140,7 @@ func TestServerStartAndShutdown(t *testing.T) {
 }
 
 func TestContentTypeJSON(t *testing.T) {
-	s := New(0, "0.1.0", "test-uuid", "standalone", "")
+	s := New(0, "0.1.0", "test-uuid", "standalone", "", config.ScanAPIConfig{})
 
 	tests := []struct {
 		name    string
