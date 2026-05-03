@@ -13,6 +13,7 @@ import (
 type scanRequest struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`
+	SNI  string `json:"sni"`
 }
 
 type scanHandler struct {
@@ -53,10 +54,15 @@ func (h *scanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
+	sni := req.SNI
+	if sni == "" {
+		sni = req.Host
+	}
+
 	ep := scanner.EndpointResult{
 		Host: req.Host,
 		Port: req.Port,
-		SNI:  req.Host,
+		SNI:  sni,
 	}
 
 	result := scanner.ScanEndpoint(ctx, ep, 10*time.Second)
