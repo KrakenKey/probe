@@ -46,14 +46,14 @@ func New(port int, version, probeID, mode, region string, scanAPI config.ScanAPI
 	mux.HandleFunc("/readyz", s.handleReadyz)
 
 	if scanAPI.Enabled {
-		mux.Handle("/scan", newScanHandler(scanAPI.Secret))
+		mux.Handle("/scan", http.TimeoutHandler(newScanHandler(scanAPI.Secret), 20*time.Second, `{"error":"timeout"}`))
 	}
 
 	s.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 20 * time.Second,
+		WriteTimeout: 5 * time.Second,
 	}
 
 	return s
