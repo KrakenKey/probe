@@ -89,6 +89,10 @@ health:
   enabled: true                          # KK_PROBE_HEALTH_ENABLED
   port: 8080                             # KK_PROBE_HEALTH_PORT
 
+scan_api:
+  enabled: false                         # KK_PROBE_SCAN_API_ENABLED
+  secret: ""                             # KK_PROBE_SCAN_API_SECRET (min 32 chars, required if enabled)
+
 logging:
   level: "info"                          # KK_PROBE_LOG_LEVEL (debug|info|warn|error)
   format: "json"                         # KK_PROBE_LOG_FORMAT (json|text)
@@ -114,6 +118,8 @@ Use the `sni` field when the hostname you connect to differs from the hostname e
 | `KK_PROBE_ENDPOINTS` | | Comma-separated `host:port` pairs. Port defaults to `443` if omitted. |
 | `KK_PROBE_HEALTH_ENABLED` | `true` | Enable health endpoint |
 | `KK_PROBE_HEALTH_PORT` | `8080` | Health endpoint port |
+| `KK_PROBE_SCAN_API_ENABLED` | `false` | Enable the authenticated on-demand scan API (`POST /scan`) |
+| `KK_PROBE_SCAN_API_SECRET` | | Bearer token secret for `POST /scan` authentication (min 32 chars). Required when scan API is enabled. |
 | `KK_PROBE_LOG_LEVEL` | `info` | Log level |
 | `KK_PROBE_LOG_FORMAT` | `json` | Log format |
 
@@ -257,6 +263,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o krakenkey-pr
                                |
                          GET /healthz
                          GET /readyz
+                         POST /scan  (when scan API enabled)
 ```
 
 1. On startup, the probe loads its config and generates or reads its probe ID. In `connected`/`hosted` modes, it registers with the KrakenKey API.
@@ -329,6 +336,39 @@ Returns `200 OK` after the first scan completes:
 ```json
 { "status": "ready" }
 ```
+
+## On-Demand Scan API
+
+When `KK_PROBE_SCAN_API_ENABLED=true`, the probe exposes an authenticated `POST /scan` endpoint that triggers an immediate TLS scan of a given host.
+
+This endpoint is used by the KrakenKey API to serve the public free TLS scanner at [krakenkey.io/scanner](https://krakenkey.io/scanner). The API proxies the request to a hosted probe using a shared secret.
+
+### Authentication
+
+Requests must include an `Authorization: Bearer <secret>` header where `<secret>` matches `KK_PROBE_SCAN_API_SECRET`.
+
+### Request
+
+```http
+POST /scan
+Authorization: Bearer <secret>
+Content-Type: application/json
+
+{
+  "host": "example.com",
+  "port": 443
+}
+```
+
+### Response
+
+Returns the same scan result structure as a scheduled scan cycle.
+
+### Security
+
+- The secret must be at least 32 characters. The probe refuses to start if `scan_api.enabled` is `true` and `scan_api.secret` is too short.
+- The probe should not be exposed on a public network port when the scan API is enabled. Use a private network (e.g., Docker `internal-bridge`) and let the KrakenKey API proxy requests.
+- SSRF protection (blocking private IP ranges) is enforced by the KrakenKey API layer before requests reach the probe.
 
 ## Troubleshooting
 
