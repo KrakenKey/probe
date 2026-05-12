@@ -89,6 +89,10 @@ health:
   enabled: true                          # KK_PROBE_HEALTH_ENABLED
   port: 8080                             # KK_PROBE_HEALTH_PORT
 
+scan_api:
+  enabled: false                         # KK_PROBE_SCAN_API_ENABLED
+  secret: ""                             # KK_PROBE_SCAN_API_SECRET (min 32 chars when enabled)
+
 logging:
   level: "info"                          # KK_PROBE_LOG_LEVEL (debug|info|warn|error)
   format: "json"                         # KK_PROBE_LOG_FORMAT (json|text)
@@ -114,6 +118,8 @@ Use the `sni` field when the hostname you connect to differs from the hostname e
 | `KK_PROBE_ENDPOINTS` | | Comma-separated `host:port` pairs. Port defaults to `443` if omitted. |
 | `KK_PROBE_HEALTH_ENABLED` | `true` | Enable health endpoint |
 | `KK_PROBE_HEALTH_PORT` | `8080` | Health endpoint port |
+| `KK_PROBE_SCAN_API_ENABLED` | `false` | Enable the `POST /scan` on-demand scan endpoint |
+| `KK_PROBE_SCAN_API_SECRET` | | Bearer secret for `POST /scan` authentication (min 32 chars) |
 | `KK_PROBE_LOG_LEVEL` | `info` | Log level |
 | `KK_PROBE_LOG_FORMAT` | `json` | Log format |
 
@@ -253,10 +259,11 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o krakenkey-pr
 +----------------+       +-----+-----+       +------------------+
 |  probe.yaml /  | ----> | KrakenKey | ----> | TLS Endpoints    |
 |  env vars      |       |   Probe   |       | (host:port)      |
-+----------------+       +-----------+       +------------------+
++----------------+       +-----+-----+       +------------------+
                                |
                          GET /healthz
                          GET /readyz
+                         POST /scan  (if scan_api.enabled)
 ```
 
 1. On startup, the probe loads its config and generates or reads its probe ID. In `connected`/`hosted` modes, it registers with the KrakenKey API.
@@ -285,6 +292,48 @@ For each endpoint, the probe extracts:
 - SHA-256 fingerprint
 - Chain depth and completeness
 - Trust status (verified against system cert pool)
+
+## On-Demand Scan API
+
+The probe can expose an authenticated `POST /scan` endpoint for on-demand TLS scans. This is used by KrakenKey's hosted infrastructure to power the free public TLS scanner at `krakenkey.io/scanner`.
+
+### Configuration
+
+```yaml
+scan_api:
+  enabled: true
+  secret: "<minimum-32-character-secret-here>"
+```
+
+Or via environment variables:
+
+```bash
+KK_PROBE_SCAN_API_ENABLED=true
+KK_PROBE_SCAN_API_SECRET=your-secret-here  # min 32 chars
+```
+
+The probe refuses to start if `scan_api.enabled` is `true` and `secret` is shorter than 32 characters.
+
+### Request
+
+```
+POST /scan
+Authorization: Bearer <secret>
+Content-Type: application/json
+
+{"host": "example.com", "port": 443}
+```
+
+### Response
+
+Returns the same TLS scan result structure as a scheduled scan: TLS version, cipher suite, certificate metadata, chain validity, handshake latency.
+
+### Security
+
+- Disabled by default (`KK_PROBE_SCAN_API_ENABLED=false`)
+- SSRF protection is applied at the KrakenKey API layer before requests reach the probe
+- Keep the probe off public network interfaces — expose it only on an internal bridge network
+- Use a minimum 32-character cryptographically random secret
 
 ## API Key Setup
 
@@ -349,6 +398,9 @@ The probe is sending reports too frequently. Increase `KK_PROBE_INTERVAL`.
 
 **Probe ID keeps changing**
 Ensure the state file path is persistent across restarts. When using Docker, mount a volume to `/var/lib/krakenkey-probe`.
+
+**"scan_api.secret must be at least 32 characters"**
+Generate a longer secret: `openssl rand -hex 32`
 
 ## License
 
