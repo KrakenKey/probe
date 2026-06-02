@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-05-03
+
+### Added
+
+- On-demand scan API: `POST /scan` endpoint (disabled by default; enable with `KK_PROBE_SCAN_API_ENABLED=true`).
+- `KK_PROBE_SCAN_API_ENABLED` environment variable — enables the `POST /scan` endpoint. Also configurable via `scan_api.enabled` in the YAML config file.
+- `KK_PROBE_SCAN_API_SECRET` environment variable — Bearer secret authenticating requests to `POST /scan`. Also configurable via `scan_api.secret`. Minimum 32 characters enforced at startup.
+
+### Security
+
+- Startup validation rejects the process if `KK_PROBE_SCAN_API_ENABLED` is `true` and the configured secret is shorter than 32 characters.
+
+[0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
+
 ## [0.1.0] - 2026-03-17
 
 ### Added
