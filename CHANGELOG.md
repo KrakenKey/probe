@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-05-03
+
+### Added
+
+- `POST /scan` on-demand scan API: triggers an immediate TLS scan for a given host and port without waiting for the next scheduled interval. Authentication uses a shared secret passed via the `X-Probe-Secret` header.
+- `KK_PROBE_SCAN_API_ENABLED` environment variable (default: `false`) — enable or disable the on-demand scan endpoint at runtime without restarting the probe.
+- `KK_PROBE_SCAN_API_SECRET` environment variable — shared secret for the `POST /scan` endpoint. Minimum 32 characters. Required when `KK_PROBE_SCAN_API_ENABLED=true`.
+
 ## [0.1.0] - 2026-03-17
 
 ### Added
@@ -22,4 +32,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI pipeline with lint, test, and build matrix
 - Kubernetes deployment example with ConfigMap, Secrets, and health probes
 
+[0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
 [0.1.0]: https://github.com/krakenkey/probe/releases/tag/v0.1.0
