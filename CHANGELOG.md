@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-05-03
+
+### Added
+
+- `POST /scan` on-demand scan API: authenticated endpoint for triggering an immediate TLS scan of any reachable host. Returns the full scan result in the same format as scheduled scans.
+- `KK_PROBE_SCAN_API_ENABLED` env var (default: `false`) — enables the `/scan` endpoint. Also configurable via YAML `scan_api.enabled`.
+- `KK_PROBE_SCAN_API_SECRET` env var — Bearer token for `/scan` authentication (sent via `X-Probe-Secret` header); minimum 32 characters enforced at startup. Also configurable via YAML `scan_api.secret`.
+- `ScanAPIConfig` struct added to the config package (`enabled`, `secret` fields).
+
+[0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
+
 ## [0.1.0] - 2026-03-17
 
 ### Added
