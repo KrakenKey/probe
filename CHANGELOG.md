@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-05-03
+
+### Added
+
+- `POST /scan` endpoint — public scan API, proxied by the KrakenKey backend's `PublicScanModule`; disabled by default
+- `KK_PROBE_SCAN_API_ENABLED` environment variable (default: `false`); set to `true` to enable the scan API
+- `KK_PROBE_SCAN_API_SECRET` environment variable — value matched against the `X-Probe-Secret` header; authentication for requests from the KrakenKey API (`KK_PROBE_SCAN_SECRET` env var on the API side must match)
+- `ScanAPIConfig` struct in probe configuration
+
+[0.2.0]: https://github.com/krakenkey/probe/compare/v0.1.0...v0.2.0
+
 ## [0.1.0] - 2026-03-17
 
 ### Added
