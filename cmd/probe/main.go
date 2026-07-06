@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/krakenkey/probe/internal/config"
 	"github.com/krakenkey/probe/internal/health"
@@ -101,7 +102,7 @@ func main() {
 
 	// Graceful shutdown
 	if healthSrv != nil {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*1e9) // 5s
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		if err := healthSrv.Shutdown(shutdownCtx); err != nil {
 			logger.Error("health server shutdown error", "error", err)
