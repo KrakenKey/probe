@@ -69,7 +69,7 @@ func save(path string, s *State) error {
 	if err != nil {
 		return fmt.Errorf("marshaling state: %w", err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func generateID() (string, error) {
