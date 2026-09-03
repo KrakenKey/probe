@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- State file now written with `0600` permissions instead of `0644` (#31)
+- Graceful-shutdown timeout uses a `time.Second` literal instead of a raw nanosecond constant; Go bumped to 1.24.0 (#31)
+
+## [0.2.0] - 2026-05-03
+
+### Added
+
+- `POST /scan` endpoint — authenticated on-demand scan API, disabled by default; enable with `KK_PROBE_SCAN_API_ENABLED=true` (or `scan_api.enabled` in YAML)
+- Bearer-token authentication for the scan API via `KK_PROBE_SCAN_API_SECRET` (`scan_api.secret`); startup fails if the secret is shorter than 32 characters while the scan API is enabled
+- `ScanAPIConfig` struct in probe configuration
+- Used by the KrakenKey API's `POST /public/scan` (`PublicScanModule`) to proxy free TLS scan requests to hosted probes
+- **On-Demand Scan API** section in README covering config, request format, response shape, and security guidance (#16)
+
 ## [0.1.0] - 2026-03-17
 
 ### Added
@@ -23,3 +40,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kubernetes deployment example with ConfigMap, Secrets, and health probes
 
 [0.1.0]: https://github.com/krakenkey/probe/releases/tag/v0.1.0
+[0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
