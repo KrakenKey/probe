@@ -9,5 +9,6 @@ linters:
         - (io.Closer).Close
         - (io.ReadCloser).Close
         - (net.Conn).Close
+        - (*crypto/tls.Conn).Close
         - (net.Listener).Close
         - (*os.File).Close
