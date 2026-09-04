@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-04
+
 ### Changed
 
 - State file now written with `0600` permissions instead of `0644` (#31)
 - Graceful-shutdown timeout uses a `time.Second` literal instead of a raw nanosecond constant; Go bumped to 1.24.0 (#31)
+
+### Build
+
+- All workflow actions bumped to Node24-capable majors ahead of GitHub's Node20 removal; golangci-lint v2 with restored deferred-Close errcheck exclusions (#33)
 
 ## [0.2.0] - 2026-05-03
 
@@ -41,3 +47,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.0]: https://github.com/krakenkey/probe/releases/tag/v0.1.0
 [0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
+[0.3.0]: https://github.com/krakenkey/probe/releases/tag/v0.3.0
