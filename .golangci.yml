@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      # Restore the deferred-Close exclusions that golangci-lint v1 applied by
+      # default; every flagged site is a defer/cleanup Close on a read path.
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (net.Conn).Close
+        - (*crypto/tls.Conn).Close
+        - (net.Listener).Close
+        - (*os.File).Close
