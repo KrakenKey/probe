@@ -293,6 +293,18 @@ For each endpoint, the probe extracts:
 - Chain depth and completeness
 - Trust status (verified against system cert pool)
 
+### Chain completeness and AIA
+
+Chain verification uses Go's `crypto/x509`, which **does not** fetch the issuing intermediate from a leaf certificate's `authorityInformationAccess` (AIA) `caIssuers` URL. Windows CryptoAPI/Schannel, macOS Security.framework and Chrome's built-in verifier do; OpenSSL, Go, Firefox and Java PKIX (by default) do not.
+
+This is deliberate and worth understanding when reading results: the probe reports what a non-AIA-fetching client sees. An endpoint serving only its leaf certificate is reported as an incomplete chain and untrusted even though it may load without complaint in a desktop browser. That is the correct signal — the chain really is incomplete, and it will fail for `curl`, Go services, and most CI runners.
+
+### OCSP stapling and revocation
+
+`OCSP stapling status` records **whether a stapled response was present** in the handshake. The probe does not currently parse or validate the stapled response, so it does not surface revocation status.
+
+If revocation checking is added, do not assume an OCSP responder URL can be read from the leaf. CA/Browser Forum ballot SC104 (passed 2026-09-03) relaxed `authorityInformationAccess` from MUST to SHOULD in subscriber certificates, so a compliant leaf may carry no AIA extension and therefore no `id-ad-ocsp` URL. BR §7.1.2.11.2 requires `crlDistributionPoints` in subscriber certificates that are neither short-lived nor carrying an AIA `id-ad-ocsp` accessMethod, so a CRLDP fallback path is required rather than optional.
+
 ## On-Demand Scan API
 
 The probe can expose an authenticated `POST /scan` endpoint for on-demand TLS scans. This is used by KrakenKey's hosted infrastructure to power the free public TLS scanner at `krakenkey.io/scanner`.

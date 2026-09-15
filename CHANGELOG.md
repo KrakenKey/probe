@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Chain completeness and AIA**: new README subsection explaining that chain verification uses Go's `crypto/x509`, which does not fetch the AIA `caIssuers` URL, and that the probe therefore reports what a non-AIA-fetching client sees — an endpoint serving only its leaf is correctly reported as incomplete and untrusted even when a desktop browser accepts it
+- **OCSP stapling and revocation**: new README subsection clarifying that `OCSP stapling status` records only the presence of a stapled response, not revocation status, and recording the CRLDP-fallback requirement for any future revocation work
+
+### Advisory
+
+- **SC104 — AIA relaxed to SHOULD**: CA/Browser Forum ballot passed 2026-09-03 (unanimous); IPR Review Period to 2026-10-03. `authorityInformationAccess` becomes SHOULD in the TLS subscriber certificate profile, so a compliant leaf may carry no AIA extension and no `id-ad-ocsp` responder URL. No probe change required today — stapling detection reads the handshake, not the certificate — but any revocation-status work must treat a missing OCSP URL as expected and fall back to `crlDistributionPoints` (BR §7.1.2.11.2)
+
 ## [0.3.0] - 2026-09-04
 
 ### Changed
