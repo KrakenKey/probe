@@ -280,30 +280,37 @@ For each endpoint, the probe extracts:
 - TLS protocol version (1.0, 1.1, 1.2, 1.3)
 - Negotiated cipher suite
 - TLS handshake latency (ms)
-- OCSP stapling status
+- OCSP stapling status (whether a stapled response was present; see below)
 
 **Certificate metadata:**
-- Subject CN and SANs
-- Issuer chain
+- Subject and SANs
+- Issuer (the leaf certificate's issuer DN)
 - Serial number
 - Validity period and days until expiry
 - Key type and size (RSA/ECDSA/Ed25519)
 - Signature algorithm
 - SHA-256 fingerprint
-- Chain depth and completeness
-- Trust status (verified against system cert pool)
+- Chain depth (number of certificates the server sent) and completeness (see below)
+- Trust status (path validation against the system trust store; see below)
 
-### Chain completeness and AIA
+### Chain completeness, trust and AIA
 
-Chain verification uses Go's `crypto/x509`, which **does not** fetch the issuing intermediate from a leaf certificate's `authorityInformationAccess` (AIA) `caIssuers` URL. Windows CryptoAPI/Schannel, macOS Security.framework and Chrome's built-in verifier do; OpenSSL, Go, Firefox and Java PKIX (by default) do not.
+The probe reports two separate chain fields, and they answer different questions:
 
-This is deliberate and worth understanding when reading results: the probe reports what a non-AIA-fetching client sees. An endpoint serving only its leaf certificate is reported as an incomplete chain and untrusted even though it may load without complaint in a desktop browser. That is the correct signal — the chain really is incomplete, and it will fail for `curl`, Go services, and most CI runners.
+- `chainComplete` is `true` only when the last certificate the server sends is a self-signed CA certificate, meaning the server included the root. Most correctly configured servers send the leaf plus intermediates and leave the root out, which TLS allows because clients already hold the root. For those servers `chainComplete` is `false`, and that is not a fault on its own. A server that sends only its leaf is also `false`.
+- `trusted` is `true` when a path can be built from the leaf, through the intermediates the server sent, to a root in the system trust store, with every certificate in its validity period. This is the field that tells you whether clients can validate the chain. It does not check that the certificate matches the endpoint's host or SNI.
+
+On Linux, which covers the Docker image and the Linux release binaries, trust is checked by Go's own `crypto/x509` verifier. It does **not** fetch a missing intermediate from the leaf's `authorityInformationAccess` (AIA) `caIssuers` URL, so an endpoint that serves only its leaf is reported as untrusted. That matches what clients without AIA fetching see, such as OpenSSL-based tools like `curl`, Go programs on Linux, and Java with default settings. Windows CryptoAPI/Schannel, macOS Security.framework and Chrome do fetch AIA, and Firefox usually accepts such a server too because it ships known intermediates in advance. So a site that loads in a desktop browser can still be reported as untrusted here. The fix is to configure the server to send its intermediate certificates.
+
+On macOS, Go hands verification to the system verifier (Security.framework), which can fetch AIA intermediates. The macOS binaries may therefore report a leaf-only endpoint as trusted where the Linux build does not.
 
 ### OCSP stapling and revocation
 
-`OCSP stapling status` records **whether a stapled response was present** in the handshake. The probe does not currently parse or validate the stapled response, so it does not surface revocation status.
+`ocspStapled` is `true` when the server included a stapled OCSP response in the handshake. The probe does not parse or validate that response, so it reports nothing about revocation status. The field is omitted from JSON output when no response was stapled.
 
-If revocation checking is added, do not assume an OCSP responder URL can be read from the leaf. CA/Browser Forum ballot SC104 (passed 2026-09-03) relaxed `authorityInformationAccess` from MUST to SHOULD in subscriber certificates, so a compliant leaf may carry no AIA extension and therefore no `id-ad-ocsp` URL. BR §7.1.2.11.2 requires `crlDistributionPoints` in subscriber certificates that are neither short-lived nor carrying an AIA `id-ad-ocsp` accessMethod, so a CRLDP fallback path is required rather than optional.
+No stapled response is normal for many certificates today. Let's Encrypt, for example, removed OCSP URLs from its certificates in May 2025 and shut down its OCSP responders in August 2025, so servers using Let's Encrypt certificates have nothing to staple.
+
+If revocation checking is added, do not assume an OCSP responder URL can be read from the leaf. CA/Browser Forum ballot SC104 (passed 2026-09-03) changes the `authorityInformationAccess` extension in subscriber certificates from MUST to SHOULD, so a compliant leaf may have no AIA extension at all, and the `id-ad-ocsp` access method inside it was already optional. Baseline Requirements §7.1.2.11.2 requires `crlDistributionPoints` in subscriber certificates that are not short-lived and have no `id-ad-ocsp` URL, so revocation checking needs a CRL path, not only OCSP. Short-lived subscriber certificates may carry neither, since CAs are not required to support revocation for them.
 
 ## On-Demand Scan API
 

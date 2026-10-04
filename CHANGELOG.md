@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **Chain completeness and AIA**: new README subsection explaining that chain verification uses Go's `crypto/x509`, which does not fetch the AIA `caIssuers` URL, and that the probe therefore reports what a non-AIA-fetching client sees — an endpoint serving only its leaf is correctly reported as incomplete and untrusted even when a desktop browser accepts it
-- **OCSP stapling and revocation**: new README subsection clarifying that `OCSP stapling status` records only the presence of a stapled response, not revocation status, and recording the CRLDP-fallback requirement for any future revocation work
+- README: explain what `chainComplete` and `trusted` mean (`chainComplete` is only `true` when the server sends the root; `trusted` is the path-validation result and does not check the hostname)
+- README: note that the Linux build (including the Docker image) does not fetch AIA `caIssuers` intermediates, so a leaf-only endpoint is reported as untrusted, while the macOS build uses the system verifier, which can fetch them
+- README: clarify that `ocspStapled` records only whether a response was stapled, not revocation status, and that Let's Encrypt certificates no longer have OCSP to staple
+- README: "Issuer chain" corrected to the leaf certificate's issuer DN, which is what the probe collects
 
 ### Advisory
 
-- **SC104 — AIA relaxed to SHOULD**: CA/Browser Forum ballot passed 2026-09-03 (unanimous); IPR Review Period to 2026-10-03. `authorityInformationAccess` becomes SHOULD in the TLS subscriber certificate profile, so a compliant leaf may carry no AIA extension and no `id-ad-ocsp` responder URL. No probe change required today — stapling detection reads the handshake, not the certificate — but any revocation-status work must treat a missing OCSP URL as expected and fall back to `crlDistributionPoints` (BR §7.1.2.11.2)
+- **SC104, AIA relaxed to SHOULD**: CA/Browser Forum ballot passed 2026-09-03 and its IPR review period ended 2026-10-03; it is not yet in a published Baseline Requirements version (latest published is v2.3.0). `authorityInformationAccess` becomes SHOULD in subscriber certificates, so a compliant leaf may have no AIA extension and no `id-ad-ocsp` URL. No probe change is needed today because stapling detection reads the handshake, not the certificate. Any future revocation checking must treat a missing OCSP URL as expected and fall back to `crlDistributionPoints` (BR §7.1.2.11.2)
 
 ## [0.3.0] - 2026-09-04
 
