@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ### Prerequisites
 
-- [Go 1.23+](https://go.dev/dl/)
+- [Go 1.26+](https://go.dev/dl/)
 - [golangci-lint](https://golangci-lint.run/welcome/install-locally/) (for linting)
 - Docker (optional, for container builds)
 

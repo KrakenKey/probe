@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Build with Go 1.26 instead of end-of-life Go 1.24, picking up stdlib fixes reachable from the probe in crypto/tls, crypto/x509, encoding/asn1, net/http and net/url (GO-2026-6090, GO-2026-5856, GO-2026-4870, GO-2026-5037, GO-2026-4947, GO-2026-4946, GO-2026-5972)
+
+### Build
+
+- CI test job runs `govulncheck ./...` so stdlib and dependency vulnerabilities fail the build
+
 ## [0.3.0] - 2026-09-04
 
 ### Changed
