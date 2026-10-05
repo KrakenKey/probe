@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-05
+
 ### Security
 
 - Build with Go 1.26 instead of end-of-life Go 1.24, picking up stdlib fixes reachable from the probe in crypto/tls, crypto/x509, encoding/asn1, net/http and net/url (GO-2026-6090, GO-2026-5856, GO-2026-4870, GO-2026-5037, GO-2026-4947, GO-2026-4946, GO-2026-5972)
@@ -67,3 +69,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.0]: https://github.com/krakenkey/probe/releases/tag/v0.1.0
 [0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
 [0.3.0]: https://github.com/krakenkey/probe/releases/tag/v0.3.0
+[0.3.1]: https://github.com/krakenkey/probe/releases/tag/v0.3.1
