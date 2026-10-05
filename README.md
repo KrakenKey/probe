@@ -31,6 +31,31 @@ docker run -d \
   ghcr.io/krakenkey/probe:latest
 ```
 
+## Install from .deb/.rpm
+
+Each release includes `.deb` and `.rpm` packages for Linux amd64 and arm64. They install the binary to `/usr/bin/krakenkey-probe`, a systemd unit (`krakenkey-probe.service`) that runs as a dedicated `krakenkey-probe` system user, and a default config at `/etc/krakenkey/probe.yaml`.
+
+1. Download the package for your architecture from the [latest release](https://github.com/KrakenKey/probe/releases/latest). `checksums.txt` covers the packages too.
+2. Install it:
+
+   ```bash
+   # Debian, Ubuntu
+   sudo apt install ./krakenkey-probe_*_linux_amd64.deb
+
+   # RHEL, Fedora, Amazon Linux
+   sudo dnf install ./krakenkey-probe_*_linux_amd64.rpm
+   ```
+
+3. Edit `/etc/krakenkey/probe.yaml`. It starts in `standalone` mode with `example.com` as the only endpoint. For connected mode, set `probe.mode: "connected"` and `api.key`. The file is mode `0640`, owned by `root:krakenkey-probe`, and upgrades keep your edits.
+4. Start the service. The package does not enable or start it for you:
+
+   ```bash
+   sudo systemctl enable --now krakenkey-probe
+   journalctl -u krakenkey-probe -f
+   ```
+
+The probe ID is saved in `/var/lib/krakenkey-probe/state.json`. Removing the package stops and disables the service, and keeps the config, the state directory and the system user.
+
 ## Operating Modes
 
 The probe supports three operating modes:

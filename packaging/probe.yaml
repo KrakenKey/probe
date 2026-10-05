@@ -1,0 +1,70 @@
+# KrakenKey Probe configuration (installed by the krakenkey-probe package)
+#
+# The package keeps your edits to this file on upgrade.
+# Every value can also be set with an environment variable (KK_PROBE_ prefix),
+# for example with `sudo systemctl edit krakenkey-probe`.
+# Full reference: https://github.com/KrakenKey/probe#configuration
+#
+# After editing, start the service:
+#   sudo systemctl enable --now krakenkey-probe
+
+api:
+  # KrakenKey API base URL
+  url: "https://api.krakenkey.io"       # KK_PROBE_API_URL
+
+  # Your KrakenKey API key (kk_...). Only needed for connected mode.
+  # Create one at https://app.krakenkey.io/api-keys
+  # This file is readable only by root and the krakenkey-probe group.
+  key: ""                                # KK_PROBE_API_KEY
+
+probe:
+  # Probe ID: generated on first run if empty and saved in state_file.
+  id: ""                                 # KK_PROBE_ID
+
+  # Name shown in the KrakenKey dashboard
+  name: "my-probe"                       # KK_PROBE_NAME
+
+  # Deployment mode:
+  #   standalone: scans the endpoints listed below and logs the results.
+  #               No API key, nothing is sent to KrakenKey.
+  #   connected:  fetches endpoints from KrakenKey and reports results there.
+  #               Needs api.key.
+  mode: "standalone"                     # KK_PROBE_MODE
+
+  # Optional region label (e.g. "us-east-1")
+  region: ""                             # KK_PROBE_REGION
+
+  # How often to scan endpoints (Go duration). Min: 1m, Max: 24h.
+  interval: "60m"                        # KK_PROBE_INTERVAL
+
+  # TLS dial timeout per endpoint
+  timeout: "10s"                         # KK_PROBE_TIMEOUT
+
+  # Where the probe ID is saved. The systemd unit only allows writes under
+  # /var/lib/krakenkey-probe, so keep the file there.
+  state_file: "/var/lib/krakenkey-probe/state.json"  # KK_PROBE_STATE_FILE
+
+# Endpoints to monitor (standalone mode only). Replace with your own.
+# Env override: KK_PROBE_ENDPOINTS="host1:port1,host2:port2"
+endpoints:
+  - host: "example.com"
+    port: 443
+    # Optional: SNI hostname to send in the TLS handshake (defaults to host)
+    sni: ""
+
+  # - host: "internal.corp.net"
+  #   port: 8443
+  #   sni: "internal.corp.net"
+
+# Local health check server (/healthz, /readyz). Change the port if 8080 is
+# already in use on this host, or set enabled: false.
+health:
+  enabled: true                          # KK_PROBE_HEALTH_ENABLED
+  port: 8080                             # KK_PROBE_HEALTH_PORT
+
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"                          # KK_PROBE_LOG_LEVEL
+
+  # Log format: json (structured) or text (human-readable)
+  format: "json"                         # KK_PROBE_LOG_FORMAT

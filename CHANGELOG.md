@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Linux `.deb` and `.rpm` packages for amd64 and arm64 attached to each release, named like the archives (`krakenkey-probe_<version>_linux_<arch>.deb` / `.rpm`) and listed in `checksums.txt` (KrakenKey/cli#46)
+- The packages install a `krakenkey-probe.service` systemd unit that runs as a new `krakenkey-probe` system user with a hardened sandbox and keeps its state in `/var/lib/krakenkey-probe`
+- Default config at `/etc/krakenkey/probe.yaml` (standalone mode, mode `0640`, `root:krakenkey-probe`), kept on upgrade. The service is not enabled or started on install; edit the config, then run `sudo systemctl enable --now krakenkey-probe`
+- README: "Install from .deb/.rpm" section
+
 ## [0.3.1] - 2026-10-05
 
 ### Security
