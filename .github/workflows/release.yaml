@@ -36,3 +36,14 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publish the .deb and .rpm files to packages.krakenkey.io (KrakenKey/cli#46).
+      # infra-int signs and indexes them; see its docs/PACKAGES.md. Stable tags only.
+      - name: Publish to packages.krakenkey.io
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.INFRA_DEPLOY_PAT }}
+          repository: KrakenKey/infra-int
+          event-type: package-released
+          client-payload: '{"repo": "probe", "tag": "${{ github.ref_name }}"}'
