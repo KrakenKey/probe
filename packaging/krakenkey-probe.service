@@ -1,0 +1,46 @@
+[Unit]
+Description=KrakenKey TLS monitoring probe
+Documentation=https://github.com/KrakenKey/probe
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=krakenkey-probe
+Group=krakenkey-probe
+ExecStart=/usr/bin/krakenkey-probe --config /etc/krakenkey/probe.yaml
+Restart=on-failure
+RestartSec=10s
+
+# Probe ID state file (probe.state_file defaults to
+# /var/lib/krakenkey-probe/state.json). systemd creates the directory
+# and gives it to the service user.
+StateDirectory=krakenkey-probe
+StateDirectoryMode=0750
+WorkingDirectory=/var/lib/krakenkey-probe
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
