@@ -43,4 +43,11 @@ type HostedEndpoint struct {
 	// for connected probes it is the shortest interval the plan allows.
 	// Empty when the API does not send it.
 	Interval string `json:"interval,omitempty"`
+	// LastScanAt is when the API received the last accepted result from
+	// this probe for this endpoint (RFC 3339). Kept as a string so a bad
+	// value does not fail the whole config; the scheduler parses it.
+	LastScanAt string `json:"lastScanAt,omitempty"`
+	// ScanNow is true while a user-requested scan is newer than this
+	// probe's last accepted result for the endpoint.
+	ScanNow bool `json:"scanNow,omitempty"`
 }

@@ -233,7 +233,8 @@ func TestFetchHostedConfig(t *testing.T) {
 func TestFetchHostedConfigPerEndpointInterval(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"endpoints":[` +
-			`{"host":"a.example.com","port":443,"userId":"u1","interval":"5m"},` +
+			`{"host":"a.example.com","port":443,"userId":"u1","interval":"5m",` +
+			`"lastScanAt":"2026-10-14T12:00:00Z","scanNow":true},` +
 			`{"host":"b.example.com","port":443,"userId":"u2"}` +
 			`],"interval":"5m"}`))
 	}))
@@ -250,8 +251,17 @@ func TestFetchHostedConfigPerEndpointInterval(t *testing.T) {
 	if got := cfg.Endpoints[0].Interval; got != "5m" {
 		t.Errorf("Endpoints[0].Interval = %q, want %q", got, "5m")
 	}
+	if got := cfg.Endpoints[0].LastScanAt; got != "2026-10-14T12:00:00Z" {
+		t.Errorf("Endpoints[0].LastScanAt = %q", got)
+	}
+	if !cfg.Endpoints[0].ScanNow {
+		t.Error("Endpoints[0].ScanNow = false, want true")
+	}
 	if got := cfg.Endpoints[1].Interval; got != "" {
 		t.Errorf("Endpoints[1].Interval = %q, want empty when the API omits it", got)
+	}
+	if cfg.Endpoints[1].LastScanAt != "" || cfg.Endpoints[1].ScanNow {
+		t.Error("Endpoints[1] lastScanAt/scanNow should be zero values when omitted")
 	}
 }
 

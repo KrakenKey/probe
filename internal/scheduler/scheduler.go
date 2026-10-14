@@ -55,15 +55,21 @@ type Scheduler struct {
 	remote []remoteEndpoint
 	// configLoaded is true once a config fetch has succeeded.
 	configLoaded bool
-	// lastScan holds the start time of the last scan per endpoint key.
-	// Endpoints that leave the config are removed.
+	// lastScan holds the start time of the last scan per endpoint key,
+	// or the API's lastScanAt for an endpoint the probe has not scanned
+	// itself yet. Endpoints that leave the config are removed.
 	lastScan map[string]time.Time
+	// scanNowDone marks endpoints already scanned for their current
+	// scanNow request. It is cleared once a config fetch shows scanNow
+	// false, so a stale true in the cached config does not cause a scan
+	// on every tick.
+	scanNowDone map[string]bool
 	// lastCycle is the start time of the most recent scan cycle, for the
 	// health endpoint.
 	lastCycle time.Time
-	// loggedIntervals remembers which interval problems were already
-	// logged so a bad or missing value is reported once, not every poll.
-	loggedIntervals map[string]bool
+	// loggedOnce remembers which config problems were already logged so a
+	// bad or missing value is reported once, not on every poll.
+	loggedOnce map[string]bool
 }
 
 // remoteEndpoint is an endpoint from the API config together with the
@@ -72,18 +78,22 @@ type remoteEndpoint struct {
 	key      string
 	endpoint scanner.EndpointResult
 	interval time.Duration
+	// scanNow is true while a user-requested scan is waiting for a result
+	// from this probe.
+	scanNow bool
 }
 
 func New(cfg *config.Config, probeID string, rep *reporter.Reporter, h *health.Server, logger *slog.Logger, version string) *Scheduler {
 	return &Scheduler{
-		cfg:             cfg,
-		probeID:         probeID,
-		reporter:        rep,
-		health:          h,
-		logger:          logger,
-		version:         version,
-		lastScan:        make(map[string]time.Time),
-		loggedIntervals: make(map[string]bool),
+		cfg:         cfg,
+		probeID:     probeID,
+		reporter:    rep,
+		health:      h,
+		logger:      logger,
+		version:     version,
+		lastScan:    make(map[string]time.Time),
+		scanNowDone: make(map[string]bool),
+		loggedOnce:  make(map[string]bool),
 	}
 }
 
@@ -120,9 +130,10 @@ func (s *Scheduler) runStandalone(ctx context.Context) {
 // runRemote handles connected and hosted modes. Each endpoint has its own
 // interval (see effectiveInterval). Every scanTick the probe scans the
 // endpoints that are due; every configPollInterval it refreshes the endpoint
-// list and scans new endpoints right away.
+// list and scans whatever became due: new endpoints and endpoints with a
+// pending scanNow request.
 func (s *Scheduler) runRemote(ctx context.Context) {
-	s.refreshConfig(ctx)
+	s.refreshConfig(ctx, time.Now())
 	s.runDue(ctx, time.Now())
 
 	if s.health != nil {
@@ -142,10 +153,11 @@ func (s *Scheduler) runRemote(ctx context.Context) {
 		case <-scanTicker.C:
 			s.runDue(ctx, time.Now())
 		case <-configTicker.C:
-			if added := s.refreshConfig(ctx); added > 0 {
-				s.logger.Info("endpoint config changed, scanning new endpoints", "new", added)
-				s.runDue(ctx, time.Now())
+			now := time.Now()
+			if added := s.refreshConfig(ctx, now); added > 0 {
+				s.logger.Info("endpoint config changed", "new", added)
 			}
+			s.runDue(ctx, now)
 		}
 	}
 }
@@ -168,9 +180,13 @@ func endpointKey(ep scanner.EndpointResult) string {
 // refreshConfig fetches the endpoint list from the API and replaces the
 // cached list. On failure the cached list is kept. Scan state for endpoints
 // that are no longer listed is dropped. It returns the number of endpoints
-// that were not in the previous list; those have never been scanned and are
-// due at once.
-func (s *Scheduler) refreshConfig(ctx context.Context) int {
+// the probe did not know before.
+//
+// A new endpoint takes the API's lastScanAt as its last scan time, so a
+// restart does not rescan everything at once. Without a usable lastScanAt
+// it counts as never scanned and is due at once. The API value never
+// replaces a time the probe recorded itself.
+func (s *Scheduler) refreshConfig(ctx context.Context, now time.Time) int {
 	if s.reporter == nil {
 		return 0
 	}
@@ -195,9 +211,14 @@ func (s *Scheduler) refreshConfig(ctx context.Context) int {
 	// The same host:port:sni can appear more than once in hosted mode
 	// (different users monitoring the same endpoint). The API applies one
 	// result to every matching endpoint, so scan it once, on the shortest
-	// interval among the duplicates.
+	// interval among the duplicates, and when any of them asks for scanNow.
+	// The seed is the earliest lastScanAt among them, and there is no seed
+	// when any of them lacks one, so no duplicate waits longer than its own
+	// interval.
 	endpoints := make([]remoteEndpoint, 0, len(cfg.Endpoints))
 	index := make(map[string]int, len(cfg.Endpoints))
+	seeds := make(map[string]time.Time, len(cfg.Endpoints))
+	unseeded := make(map[string]bool)
 	for _, ep := range cfg.Endpoints {
 		sni := ep.SNI
 		if sni == "" {
@@ -207,25 +228,49 @@ func (s *Scheduler) refreshConfig(ctx context.Context) int {
 		key := endpointKey(res)
 		interval := s.effectiveInterval(ep.Interval)
 
+		if seed, ok := s.parseLastScanAt(ep.LastScanAt, now); ok {
+			if prev, seen := seeds[key]; !seen || seed.Before(prev) {
+				seeds[key] = seed
+			}
+		} else {
+			unseeded[key] = true
+		}
+
 		if i, ok := index[key]; ok {
 			if interval < endpoints[i].interval {
 				endpoints[i].interval = interval
 			}
+			endpoints[i].scanNow = endpoints[i].scanNow || ep.ScanNow
 			continue
 		}
 		index[key] = len(endpoints)
-		endpoints = append(endpoints, remoteEndpoint{key: key, endpoint: res, interval: interval})
+		endpoints = append(endpoints, remoteEndpoint{key: key, endpoint: res, interval: interval, scanNow: ep.ScanNow})
 	}
 
-	added := 0
-	for key := range index {
-		if _, ok := s.lastScan[key]; !ok {
-			added++
-		}
-	}
 	for key := range s.lastScan {
 		if _, ok := index[key]; !ok {
 			delete(s.lastScan, key)
+		}
+	}
+	for key := range s.scanNowDone {
+		if _, ok := index[key]; !ok {
+			delete(s.scanNowDone, key)
+		}
+	}
+
+	added := 0
+	for _, ep := range endpoints {
+		if !ep.scanNow {
+			// The API has the result for the last scanNow request (or
+			// there was none), so the next request triggers a scan again.
+			delete(s.scanNowDone, ep.key)
+		}
+		if _, ok := s.lastScan[ep.key]; ok {
+			continue
+		}
+		added++
+		if seed, ok := seeds[ep.key]; ok && !unseeded[ep.key] {
+			s.lastScan[ep.key] = seed
 		}
 	}
 
@@ -250,7 +295,7 @@ func (s *Scheduler) effectiveInterval(raw string) time.Duration {
 	local := s.localInterval()
 
 	if raw == "" {
-		s.logIntervalOnce("missing", slog.LevelDebug,
+		s.logOnce("missing", slog.LevelDebug,
 			"API config has no per-endpoint interval, using the local interval",
 			"interval", local.String())
 		return local
@@ -258,14 +303,14 @@ func (s *Scheduler) effectiveInterval(raw string) time.Duration {
 
 	d, err := time.ParseDuration(raw)
 	if err != nil || d <= 0 {
-		s.logIntervalOnce("invalid:"+raw, slog.LevelWarn,
+		s.logOnce("invalid:"+raw, slog.LevelWarn,
 			"ignoring invalid endpoint interval from API, using the local interval",
 			"value", raw, "interval", local.String())
 		return local
 	}
 
 	if clamped := min(max(d, minEndpointInterval), maxEndpointInterval); clamped != d {
-		s.logIntervalOnce("clamped:"+raw, slog.LevelDebug,
+		s.logOnce("clamped:"+raw, slog.LevelDebug,
 			"endpoint interval from API out of range, clamping",
 			"value", raw, "interval", clamped.String())
 		d = clamped
@@ -277,16 +322,41 @@ func (s *Scheduler) effectiveInterval(raw string) time.Duration {
 	return d
 }
 
-func (s *Scheduler) logIntervalOnce(key string, level slog.Level, msg string, args ...any) {
-	if s.loggedIntervals[key] {
+// parseLastScanAt parses an endpoint's lastScanAt (RFC 3339). It reports
+// false when the value is missing or unparseable. A time in the future
+// (clock skew between probe and API) is capped at now.
+func (s *Scheduler) parseLastScanAt(raw string, now time.Time) (time.Time, bool) {
+	if raw == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		s.logOnce("lastScanAt:"+raw, slog.LevelWarn,
+			"ignoring invalid lastScanAt from API, treating endpoint as never scanned",
+			"value", raw)
+		return time.Time{}, false
+	}
+	if t.After(now) {
+		t = now
+	}
+	return t.UTC(), true
+}
+
+func (s *Scheduler) logOnce(key string, level slog.Level, msg string, args ...any) {
+	if s.loggedOnce[key] {
 		return
 	}
-	s.loggedIntervals[key] = true
+	s.loggedOnce[key] = true
 	s.logger.Log(context.Background(), level, msg, args...)
 }
 
-// isDue reports whether an endpoint should be scanned at now.
+// isDue reports whether an endpoint should be scanned at now: it has a
+// scanNow request not yet served, has never been scanned, or its interval
+// (minus dueSlack) has passed since its last scan.
 func (s *Scheduler) isDue(ep remoteEndpoint, now time.Time) bool {
+	if ep.scanNow && !s.scanNowDone[ep.key] {
+		return true
+	}
 	last, ok := s.lastScan[ep.key]
 	if !ok {
 		return true
@@ -311,7 +381,7 @@ func (s *Scheduler) nextDue(now time.Time) time.Time {
 	var next time.Time
 	for _, ep := range s.remote {
 		at := now
-		if last, ok := s.lastScan[ep.key]; ok {
+		if last, ok := s.lastScan[ep.key]; ok && (!ep.scanNow || s.scanNowDone[ep.key]) {
 			at = last.Add(ep.interval)
 		}
 		if next.IsZero() || at.Before(next) {
@@ -330,13 +400,18 @@ func (s *Scheduler) runDue(ctx context.Context, now time.Time) {
 		return
 	}
 
-	s.logger.Info("scan cycle starting", "time", now.Format(time.RFC3339), "due", len(due), "total", len(s.remote))
-
 	endpoints := make([]scanner.EndpointResult, len(due))
+	requested := 0
 	for i, ep := range due {
 		endpoints[i] = ep.endpoint
 		s.lastScan[ep.key] = now
+		if ep.scanNow {
+			s.scanNowDone[ep.key] = true
+			requested++
+		}
 	}
+
+	s.logger.Info("scan cycle starting", "time", now.Format(time.RFC3339), "due", len(due), "requested", requested, "total", len(s.remote))
 
 	s.scanAndReport(ctx, now, endpoints)
 	s.lastCycle = now

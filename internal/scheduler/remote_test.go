@@ -219,7 +219,7 @@ func TestDueComputationHosted(t *testing.T) {
 	api.setEndpoints(ep(19981, "5m"), ep(19982, "60m"), ep(19983, ""))
 	s := newRemoteScheduler(t, "hosted", 30*time.Minute, api, "hosted-id")
 
-	if added := s.refreshConfig(context.Background()); added != 3 {
+	if added := s.refreshConfig(context.Background(), time.Now()); added != 3 {
 		t.Fatalf("refreshConfig() added = %d, want 3", added)
 	}
 
@@ -270,7 +270,7 @@ func TestDueComputationConnectedFloor(t *testing.T) {
 	// Plan allows 1m, but the user set 30m locally: scan every 30m.
 	api.setEndpoints(ep(19984, "1m"))
 	s := newRemoteScheduler(t, "connected", 30*time.Minute, api, "conn-id")
-	s.refreshConfig(context.Background())
+	s.refreshConfig(context.Background(), time.Now())
 
 	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	s.runDue(context.Background(), t0)
@@ -287,7 +287,7 @@ func TestDueComputationConnectedFloor(t *testing.T) {
 
 	// Plan floor of 60m is slower than the local 30m: scan every 60m.
 	api.setEndpoints(ep(19984, "60m"))
-	if added := s.refreshConfig(context.Background()); added != 0 {
+	if added := s.refreshConfig(context.Background(), time.Now()); added != 0 {
 		t.Errorf("interval change counted as %d new endpoints, want 0", added)
 	}
 	if due := s.dueEndpoints(t0.Add(30 * time.Minute)); len(due) != 0 {
@@ -304,7 +304,7 @@ func TestOlderAPIUsesLocalInterval(t *testing.T) {
 			api := newFakeAPI(t, "p")
 			api.setEndpoints(ep(19985, ""), ep(19986, ""))
 			s := newRemoteScheduler(t, mode, 10*time.Minute, api, "p")
-			s.refreshConfig(context.Background())
+			s.refreshConfig(context.Background(), time.Now())
 
 			for _, r := range s.remote {
 				if r.interval != 10*time.Minute {
@@ -322,12 +322,12 @@ func TestNewEndpointScannedImmediatelyAndRemovedForgotten(t *testing.T) {
 	ctx := context.Background()
 
 	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	s.refreshConfig(ctx)
+	s.refreshConfig(ctx, time.Now())
 	s.runDue(ctx, t0)
 
 	// A second endpoint shows up: only it is scanned.
 	api.setEndpoints(ep(19987, "60m"), ep(19988, "60m"))
-	if added := s.refreshConfig(ctx); added != 1 {
+	if added := s.refreshConfig(ctx, time.Now()); added != 1 {
 		t.Fatalf("refreshConfig() added = %d, want 1", added)
 	}
 	s.runDue(ctx, t0.Add(time.Minute))
@@ -337,7 +337,7 @@ func TestNewEndpointScannedImmediatelyAndRemovedForgotten(t *testing.T) {
 
 	// The first endpoint is removed: its state is dropped.
 	api.setEndpoints(ep(19988, "60m"))
-	if added := s.refreshConfig(ctx); added != 0 {
+	if added := s.refreshConfig(ctx, time.Now()); added != 0 {
 		t.Errorf("refreshConfig() after removal added = %d, want 0", added)
 	}
 	if len(s.remote) != 1 || len(s.lastScan) != 1 {
@@ -349,7 +349,7 @@ func TestNewEndpointScannedImmediatelyAndRemovedForgotten(t *testing.T) {
 
 	// If it comes back it counts as new and is scanned right away.
 	api.setEndpoints(ep(19987, "60m"), ep(19988, "60m"))
-	if added := s.refreshConfig(ctx); added != 1 {
+	if added := s.refreshConfig(ctx, time.Now()); added != 1 {
 		t.Errorf("refreshConfig() after re-adding added = %d, want 1", added)
 	}
 	s.runDue(ctx, t0.Add(2*time.Minute))
@@ -359,7 +359,7 @@ func TestNewEndpointScannedImmediatelyAndRemovedForgotten(t *testing.T) {
 
 	// A changed SNI is a different endpoint.
 	api.setEndpoints(ep(19987, "60m"), map[string]any{"host": "127.0.0.1", "port": 19988, "sni": "other.example", "interval": "60m"})
-	if added := s.refreshConfig(ctx); added != 1 {
+	if added := s.refreshConfig(ctx, time.Now()); added != 1 {
 		t.Errorf("refreshConfig() after SNI change added = %d, want 1", added)
 	}
 }
@@ -369,7 +369,7 @@ func TestDuplicateEndpointsScannedOnceAtShortestInterval(t *testing.T) {
 	api.setEndpoints(ep(19989, "60m"), ep(19989, "5m"), ep(19989, ""))
 	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
 
-	if added := s.refreshConfig(context.Background()); added != 1 {
+	if added := s.refreshConfig(context.Background(), time.Now()); added != 1 {
 		t.Fatalf("refreshConfig() added = %d, want 1", added)
 	}
 	if len(s.remote) != 1 {
@@ -387,11 +387,11 @@ func TestRefreshKeepsCacheOnError(t *testing.T) {
 	ctx := context.Background()
 
 	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	s.refreshConfig(ctx)
+	s.refreshConfig(ctx, time.Now())
 	s.runDue(ctx, t0)
 
 	api.setFailing(true)
-	if added := s.refreshConfig(ctx); added != 0 {
+	if added := s.refreshConfig(ctx, time.Now()); added != 0 {
 		t.Errorf("refreshConfig() on error added = %d, want 0", added)
 	}
 	if len(s.remote) != 1 || len(s.lastScan) != 1 {
@@ -411,11 +411,11 @@ func TestEmptyConfigClearsState(t *testing.T) {
 	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
 	ctx := context.Background()
 
-	s.refreshConfig(ctx)
+	s.refreshConfig(ctx, time.Now())
 	s.runDue(ctx, time.Now())
 
 	api.setEndpoints()
-	s.refreshConfig(ctx)
+	s.refreshConfig(ctx, time.Now())
 	if len(s.remote) != 0 || len(s.lastScan) != 0 {
 		t.Errorf("remote = %d, lastScan = %d, want both empty", len(s.remote), len(s.lastScan))
 	}
@@ -494,5 +494,216 @@ func TestStandaloneIgnoresRemoteConfig(t *testing.T) {
 	}
 	if len(s.remote) != 0 || len(s.lastScan) != 0 {
 		t.Error("standalone mode populated per-endpoint state")
+	}
+}
+
+func seeded(port int, interval string, lastScanAt string) map[string]any {
+	m := ep(port, interval)
+	if lastScanAt != "" {
+		m["lastScanAt"] = lastScanAt
+	}
+	return m
+}
+
+func ports(eps []remoteEndpoint) []int {
+	var out []int
+	for _, e := range eps {
+		out = append(out, e.endpoint.Port)
+	}
+	return out
+}
+
+func TestSeedFromLastScanAt(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(
+		seeded(19961, "60m", t0.Add(-50*time.Minute).Format(time.RFC3339)),
+		seeded(19962, "60m", ""),
+		seeded(19963, "60m", "yesterday"),
+	)
+	var buf bytes.Buffer
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	s.logger = slog.New(slog.NewTextHandler(&buf, nil))
+	ctx := context.Background()
+
+	if added := s.refreshConfig(ctx, t0); added != 3 {
+		t.Fatalf("refreshConfig() added = %d, want 3", added)
+	}
+	if got := s.lastScan["127.0.0.1:19961:127.0.0.1"]; !got.Equal(t0.Add(-50 * time.Minute)) {
+		t.Errorf("seeded last scan = %s, want %s", got, t0.Add(-50*time.Minute))
+	}
+
+	// Only the endpoints without a usable lastScanAt are scanned on startup.
+	if got, want := ports(s.dueEndpoints(t0)), []int{19962, 19963}; !slices.Equal(got, want) {
+		t.Errorf("due at startup = %v, want %v", got, want)
+	}
+	s.runDue(ctx, t0)
+	if got, want := api.lastReport(), []string{"127.0.0.1:19962", "127.0.0.1:19963"}; !slices.Equal(got, want) {
+		t.Errorf("startup report = %v, want %v", got, want)
+	}
+
+	// The seeded endpoint is due one interval after the API's lastScanAt.
+	if got, want := ports(s.dueEndpoints(t0.Add(10*time.Minute))), []int{19961}; !slices.Equal(got, want) {
+		t.Errorf("due after 10m = %v, want %v", got, want)
+	}
+
+	// A second poll with the same bad value does not log again.
+	s.refreshConfig(ctx, t0.Add(time.Minute))
+	if n := strings.Count(buf.String(), "ignoring invalid lastScanAt"); n != 1 {
+		t.Errorf("invalid lastScanAt logged %d times, want 1", n)
+	}
+}
+
+func TestSeedDuplicatesUseEarliest(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	recent := t0.Add(-10 * time.Minute).Format(time.RFC3339)
+	older := t0.Add(-50 * time.Minute).Format(time.RFC3339)
+
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(
+		seeded(19964, "60m", recent),
+		seeded(19964, "60m", older),
+		seeded(19965, "60m", recent),
+		seeded(19965, "60m", ""), // one duplicate never scanned by this probe
+		seeded(19966, "60m", recent),
+		seeded(19966, "60m", "not-a-time"),
+	)
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	s.refreshConfig(context.Background(), t0)
+
+	if got := s.lastScan["127.0.0.1:19964:127.0.0.1"]; !got.Equal(t0.Add(-50 * time.Minute)) {
+		t.Errorf("duplicate seed = %s, want the earliest %s", got, t0.Add(-50*time.Minute))
+	}
+	if got, want := ports(s.dueEndpoints(t0)), []int{19965, 19966}; !slices.Equal(got, want) {
+		t.Errorf("due = %v, want %v (a duplicate without a usable lastScanAt is never scanned)", got, want)
+	}
+}
+
+func TestSeedNeverOverridesLocalScan(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(seeded(19967, "60m", ""))
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	ctx := context.Background()
+
+	s.refreshConfig(ctx, t0)
+	s.runDue(ctx, t0)
+
+	for _, at := range []time.Time{t0.Add(-30 * time.Minute), t0.Add(2 * time.Minute)} {
+		api.setEndpoints(seeded(19967, "60m", at.Format(time.RFC3339)))
+		s.refreshConfig(ctx, t0.Add(3*time.Minute))
+		if got := s.lastScan["127.0.0.1:19967:127.0.0.1"]; !got.Equal(t0) {
+			t.Errorf("lastScanAt %s changed the local last scan to %s, want %s", at, got, t0)
+		}
+	}
+}
+
+func TestSeedInFutureCappedAtNow(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(seeded(19968, "5m", t0.Add(time.Hour).Format(time.RFC3339)))
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	s.refreshConfig(context.Background(), t0)
+
+	if got := s.lastScan["127.0.0.1:19968:127.0.0.1"]; !got.Equal(t0) {
+		t.Errorf("future lastScanAt seeded %s, want it capped at %s", got, t0)
+	}
+	if len(s.dueEndpoints(t0.Add(5*time.Minute))) != 1 {
+		t.Error("endpoint not due one interval after the capped seed")
+	}
+}
+
+func withScanNow(m map[string]any) map[string]any {
+	m["scanNow"] = true
+	return m
+}
+
+func TestScanNowScansOnceAndRearms(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(ep(19969, "60m"), ep(19970, "60m"))
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	ctx := context.Background()
+
+	s.refreshConfig(ctx, t0)
+	s.runDue(ctx, t0)
+
+	// A user asks for a scan of 19969: it is due at once, alone.
+	api.setEndpoints(withScanNow(ep(19969, "60m")), ep(19970, "60m"))
+	s.refreshConfig(ctx, t0.Add(time.Minute))
+	if got, want := s.nextDue(t0.Add(time.Minute)), t0.Add(time.Minute); !got.Equal(want) {
+		t.Errorf("nextDue with pending scanNow = %s, want %s", got, want)
+	}
+	s.runDue(ctx, t0.Add(time.Minute))
+	if got, want := api.lastReport(), []string{"127.0.0.1:19969"}; !slices.Equal(got, want) {
+		t.Fatalf("scanNow report = %v, want %v", got, want)
+	}
+	reports := api.reportCount()
+
+	// The cached config still says scanNow, and so may the next fetch:
+	// no repeat scans.
+	s.runDue(ctx, t0.Add(90*time.Second))
+	s.refreshConfig(ctx, t0.Add(2*time.Minute))
+	s.runDue(ctx, t0.Add(2*time.Minute))
+	if api.reportCount() != reports {
+		t.Errorf("scanNow scanned again before the API cleared it")
+	}
+
+	// The API clears scanNow; normal scheduling continues from the
+	// scanNow scan.
+	api.setEndpoints(ep(19969, "60m"), ep(19970, "60m"))
+	s.refreshConfig(ctx, t0.Add(3*time.Minute))
+	if got, want := ports(s.dueEndpoints(t0.Add(60*time.Minute))), []int{19970}; !slices.Equal(got, want) {
+		t.Errorf("due after 60m = %v, want %v", got, want)
+	}
+
+	// A new request scans again.
+	api.setEndpoints(withScanNow(ep(19969, "60m")), ep(19970, "60m"))
+	s.refreshConfig(ctx, t0.Add(4*time.Minute))
+	s.runDue(ctx, t0.Add(4*time.Minute))
+	if got, want := api.lastReport(), []string{"127.0.0.1:19969"}; api.reportCount() != reports+1 || !slices.Equal(got, want) {
+		t.Errorf("second scanNow: reports = %d, last = %v; want %d and %v", api.reportCount(), got, reports+1, want)
+	}
+}
+
+func TestScanNowRearmsWhenEndpointReturns(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	recent := t0.Format(time.RFC3339)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(withScanNow(seeded(19971, "60m", recent)))
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	ctx := context.Background()
+
+	// scanNow wins over a recent seed.
+	s.refreshConfig(ctx, t0)
+	s.runDue(ctx, t0)
+	if api.reportCount() != 1 {
+		t.Fatalf("reports = %d, want 1", api.reportCount())
+	}
+
+	api.setEndpoints()
+	s.refreshConfig(ctx, t0.Add(time.Minute))
+	if len(s.scanNowDone) != 0 {
+		t.Error("scanNow state kept for a removed endpoint")
+	}
+
+	api.setEndpoints(withScanNow(seeded(19971, "60m", recent)))
+	s.refreshConfig(ctx, t0.Add(2*time.Minute))
+	s.runDue(ctx, t0.Add(2*time.Minute))
+	if api.reportCount() != 2 {
+		t.Errorf("reports = %d, want 2 after the endpoint came back with scanNow", api.reportCount())
+	}
+}
+
+func TestScanNowOrAcrossDuplicates(t *testing.T) {
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	recent := t0.Format(time.RFC3339)
+	api := newFakeAPI(t, "hosted-id")
+	api.setEndpoints(seeded(19972, "60m", recent), withScanNow(seeded(19972, "60m", recent)))
+	s := newRemoteScheduler(t, "hosted", time.Hour, api, "hosted-id")
+	s.refreshConfig(context.Background(), t0)
+
+	if got, want := ports(s.dueEndpoints(t0)), []int{19972}; !slices.Equal(got, want) {
+		t.Errorf("due = %v, want %v", got, want)
 	}
 }

@@ -82,12 +82,14 @@ In `connected` and `hosted` modes the probe:
 
 - fetches its endpoint list from `GET /probes/:probeId/config` every 60 seconds. Each endpoint may carry an `interval` (Go duration, for example `"5m"`). A missing or unparseable value falls back to the local interval and is logged once; values outside `1m`..`24h` are clamped to that range. The top-level `interval` field of the response is ignored.
 - checks every 30 seconds which endpoints are due and scans and reports only those. An endpoint is due when it has never been scanned or its last scan started at least its interval ago (minus 5 seconds, so timer jitter does not push a scan a whole check later).
-- scans new endpoints (including an endpoint whose host, port or SNI changed) as soon as they appear in the list, and forgets endpoints that are removed.
-- scans an endpoint listed more than once (the same host, port and SNI) once, on the shortest of its intervals.
+- picks up where it left off after a restart. Each endpoint may carry a `lastScanAt` (RFC 3339): when the API last accepted a result from this probe for it. An endpoint the probe has not scanned itself since starting uses that time as its last scan, so it is scanned one interval later instead of right away. A missing or unparseable `lastScanAt` means the endpoint is scanned right away. The API value never replaces a scan time the probe recorded itself, and a time in the future is treated as now.
+- honors user-requested scans. An endpoint with `scanNow: true` is scanned on the next check, once. It is not scanned again for that request while the flag stays `true`; the next request counts once a config fetch has shown `scanNow: false` (or the endpoint was removed and added back). Interval scheduling continues as usual.
+- scans new endpoints (including an endpoint whose host, port or SNI changed) as soon as they appear in the list, unless `lastScanAt` says they were scanned recently, and forgets endpoints that are removed.
+- scans an endpoint listed more than once (the same host, port and SNI) once, on the shortest of its intervals, and when any of the listings has `scanNow: true`. Its starting point is the earliest `lastScanAt` among the listings; if any listing has no usable `lastScanAt`, it is scanned right away.
 
-If the API does not send per-endpoint intervals (older API versions), every endpoint is scanned on the local interval, as before.
+If the API does not send per-endpoint intervals, `lastScanAt` or `scanNow` (older API versions), every endpoint is scanned on the local interval, as before.
 
-`nextScan` in `/healthz` is the earliest time any endpoint becomes due.
+`nextScan` in `/healthz` is the earliest time any endpoint becomes due (now, while a `scanNow` request is waiting).
 
 ## CLI Flags
 

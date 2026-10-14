@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default config at `/etc/krakenkey/probe.yaml` (standalone mode, mode `0640`, `root:krakenkey-probe`), kept on upgrade. The service is not enabled or started on install; edit the config, then run `sudo systemctl enable --now krakenkey-probe`
 - README: "Install from .deb/.rpm" section
 - Per-endpoint scan intervals in `connected` and `hosted` modes. The probe reads an optional `interval` for each endpoint in the `GET /probes/:probeId/config` response and scans each endpoint on its own schedule instead of scanning everything on the local interval. Hosted probes use the API value; connected probes treat it as a floor and use the slower of it and the local interval. Missing or invalid values fall back to the local interval; values are clamped to `1m`..`24h`
+- Connected and hosted probes read the optional `lastScanAt` for each endpoint and use it as the last scan time for endpoints they have not scanned since starting, so a restart no longer rescans everything at once and then leaves a gap of almost two intervals. For an endpoint listed more than once the earliest value is used, and a missing or invalid value means the endpoint is scanned right away
+- Connected and hosted probes honor `scanNow` for each endpoint: a user-requested scan runs on the next 30 second check, once per request
 - README: "Scan Intervals" section
 
 ### Changed
