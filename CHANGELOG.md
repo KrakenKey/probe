@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In `connected` and `hosted` modes the probe checks every 30 seconds which endpoints are due and scans and reports only those. A config change now scans only the new or changed endpoints instead of all of them, and an endpoint listed more than once (same host, port and SNI) is scanned once per cycle instead of once per listing
 - `nextScan` in `/healthz` is the earliest time any endpoint is due in `connected` and `hosted` modes
 
+### Build
+
+- `actions/setup-go` uses `check-latest: true`, so CI and release builds use the newest Go 1.26 patch release instead of whatever the runner has cached (the cached 1.26.8 failed `govulncheck` on stdlib fixes in 1.26.9)
+
 ## [0.3.1] - 2026-10-05
 
 ### Security
