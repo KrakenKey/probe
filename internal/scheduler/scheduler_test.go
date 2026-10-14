@@ -12,14 +12,9 @@ import (
 
 	"github.com/krakenkey/probe/internal/config"
 	"github.com/krakenkey/probe/internal/health"
-	"github.com/krakenkey/probe/internal/reporter"
-	"github.com/krakenkey/probe/internal/scanner"
 )
 
 func TestRunCycleStandalone(t *testing.T) {
-	// Reset cached endpoints
-	cachedRemoteEndpoints = nil
-
 	var reportReceived atomic.Bool
 
 	// API mock — standalone should NOT call this
@@ -55,97 +50,7 @@ func TestRunCycleStandalone(t *testing.T) {
 	}
 }
 
-func TestRunCycleHostedMode(t *testing.T) {
-	cachedRemoteEndpoints = nil
-
-	var configFetched atomic.Bool
-
-	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/probes/hosted-id/config" {
-			configFetched.Store(true)
-			cfg := map[string]any{
-				"endpoints": []map[string]any{
-					{"host": "127.0.0.1", "port": 19996, "userId": "user1"},
-				},
-				"interval": "5m",
-			}
-			_ = json.NewEncoder(w).Encode(cfg)
-			return
-		}
-		if r.URL.Path == "/probes/report" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer apiSrv.Close()
-
-	cfg := &config.Config{
-		Probe: config.ProbeConfig{
-			Mode:     "hosted",
-			Region:   "us-east-1",
-			Interval: 5 * time.Minute,
-			Timeout:  2 * time.Second,
-		},
-	}
-
-	rep := reporter.New(apiSrv.URL, "service_key", "0.1.0", "linux", "amd64")
-	logger := slog.Default()
-
-	s := New(cfg, "hosted-id", rep, nil, logger, "0.1.0")
-	s.runCycle(context.Background())
-
-	if !configFetched.Load() {
-		t.Error("expected hosted config to be fetched from API")
-	}
-}
-
-func TestRunCycleHostedCacheFallback(t *testing.T) {
-	// Pre-populate cache
-	cachedRemoteEndpoints = []scanner.EndpointResult{
-		{Host: "cached.example.com", Port: 443, SNI: "cached.example.com"},
-	}
-
-	// API returns error
-	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/probes/hosted-id/config" {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if r.URL.Path == "/probes/report" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer apiSrv.Close()
-
-	cfg := &config.Config{
-		Probe: config.ProbeConfig{
-			Mode:     "hosted",
-			Region:   "us-east-1",
-			Interval: 5 * time.Minute,
-			Timeout:  2 * time.Second,
-		},
-	}
-
-	rep := reporter.New(apiSrv.URL, "service_key", "0.1.0", "linux", "amd64")
-	logger := slog.Default()
-
-	s := New(cfg, "hosted-id", rep, nil, logger, "0.1.0")
-
-	endpoints := s.resolveEndpoints(context.Background())
-	if len(endpoints) != 1 {
-		t.Fatalf("expected 1 cached endpoint, got %d", len(endpoints))
-	}
-	if endpoints[0].Host != "cached.example.com" {
-		t.Errorf("expected cached host, got %q", endpoints[0].Host)
-	}
-}
-
 func TestRunSetsReady(t *testing.T) {
-	cachedRemoteEndpoints = nil
-
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
 			Mode:     "standalone",
@@ -192,8 +97,6 @@ func TestRunSetsReady(t *testing.T) {
 }
 
 func TestResolveEndpointsSelfHosted(t *testing.T) {
-	cachedRemoteEndpoints = nil
-
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{Mode: "standalone"},
 		Endpoints: []config.Endpoint{
@@ -203,7 +106,7 @@ func TestResolveEndpointsSelfHosted(t *testing.T) {
 	}
 
 	s := &Scheduler{cfg: cfg}
-	endpoints := s.resolveEndpoints(context.Background())
+	endpoints := s.resolveEndpoints()
 
 	if len(endpoints) != 2 {
 		t.Fatalf("expected 2 endpoints, got %d", len(endpoints))
@@ -217,8 +120,6 @@ func TestResolveEndpointsSelfHosted(t *testing.T) {
 }
 
 func TestSchedulerContextCancellation(t *testing.T) {
-	cachedRemoteEndpoints = nil
-
 	cfg := &config.Config{
 		Probe: config.ProbeConfig{
 			Mode:     "standalone",

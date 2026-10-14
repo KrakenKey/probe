@@ -230,6 +230,31 @@ func TestFetchHostedConfig(t *testing.T) {
 	}
 }
 
+func TestFetchHostedConfigPerEndpointInterval(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"endpoints":[` +
+			`{"host":"a.example.com","port":443,"userId":"u1","interval":"5m"},` +
+			`{"host":"b.example.com","port":443,"userId":"u2"}` +
+			`],"interval":"5m"}`))
+	}))
+	defer srv.Close()
+
+	rep := New(srv.URL, "service_key", "0.1.0", "linux", "amd64")
+	cfg, err := rep.FetchHostedConfig(context.Background(), "test-id")
+	if err != nil {
+		t.Fatalf("FetchHostedConfig() error: %v", err)
+	}
+	if len(cfg.Endpoints) != 2 {
+		t.Fatalf("len(Endpoints) = %d, want 2", len(cfg.Endpoints))
+	}
+	if got := cfg.Endpoints[0].Interval; got != "5m" {
+		t.Errorf("Endpoints[0].Interval = %q, want %q", got, "5m")
+	}
+	if got := cfg.Endpoints[1].Interval; got != "" {
+		t.Errorf("Endpoints[1].Interval = %q, want empty when the API omits it", got)
+	}
+}
+
 func TestUserAgent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ua := r.Header.Get("User-Agent")
