@@ -471,4 +471,4 @@ Generate a longer secret: `openssl rand -hex 32`
 
 ## License
 
-[AGPL-3.0](LICENSE)
+Copyright (C) 2026 KrakenKey LLC. Licensed under [AGPL-3.0](LICENSE).
