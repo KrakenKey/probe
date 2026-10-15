@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
 ### Added
 
 - Linux `.deb` and `.rpm` packages for amd64 and arm64 attached to each release, named like the archives (`krakenkey-probe_<version>_linux_<arch>.deb` / `.rpm`) and listed in `checksums.txt` (KrakenKey/cli#46)
@@ -90,3 +92,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.0]: https://github.com/krakenkey/probe/releases/tag/v0.2.0
 [0.3.0]: https://github.com/krakenkey/probe/releases/tag/v0.3.0
 [0.3.1]: https://github.com/krakenkey/probe/releases/tag/v0.3.1
+[0.4.0]: https://github.com/krakenkey/probe/releases/tag/v0.4.0
