@@ -68,6 +68,29 @@ The probe supports three operating modes:
 
 Set the mode with `KK_PROBE_MODE` or `probe.mode` in the YAML config. Default: `standalone`.
 
+### Scan Intervals
+
+How often an endpoint is scanned depends on the mode:
+
+| Mode | Interval per endpoint |
+|---|---|
+| `standalone` | The local interval (`probe.interval` / `KK_PROBE_INTERVAL`, default `60m`). All endpoints are scanned together. |
+| `connected` | The slower of the local interval and the interval the API sends for that endpoint. The API value is the shortest interval the endpoint owner's plan allows; the API drops results that arrive sooner, so the probe never scans faster than that. Set a longer local interval to scan less often. |
+| `hosted` | The interval the API sends for that endpoint (the owner's plan interval). |
+
+In `connected` and `hosted` modes the probe:
+
+- fetches its endpoint list from `GET /probes/:probeId/config` every 60 seconds. Each endpoint may carry an `interval` (Go duration, for example `"5m"`). A missing or unparseable value falls back to the local interval and is logged once; values outside `1m`..`24h` are clamped to that range. The top-level `interval` field of the response is ignored.
+- checks every 30 seconds which endpoints are due and scans and reports only those. An endpoint is due when it has never been scanned or its last scan started at least its interval ago (minus 5 seconds, so timer jitter does not push a scan a whole check later).
+- picks up where it left off after a restart. Each endpoint may carry a `lastScanAt` (RFC 3339): when the API last accepted a result from this probe for it. An endpoint the probe has not scanned itself since starting uses that time as its last scan, so it is scanned one interval later instead of right away. A missing or unparseable `lastScanAt` means the endpoint is scanned right away. The API value never replaces a scan time the probe recorded itself, and a time in the future is treated as now.
+- honors user-requested scans. An endpoint with `scanNow: true` is scanned on the next check, once. It is not scanned again for that request while the flag stays `true`; the next request counts once a config fetch has shown `scanNow: false` (or the endpoint was removed and added back). Interval scheduling continues as usual.
+- scans new endpoints (including an endpoint whose host, port or SNI changed) as soon as they appear in the list, unless `lastScanAt` says they were scanned recently, and forgets endpoints that are removed.
+- scans an endpoint listed more than once (the same host, port and SNI) once, on the shortest of its intervals, and when any of the listings has `scanNow: true`. Its starting point is the earliest `lastScanAt` among the listings; if any listing has no usable `lastScanAt`, it is scanned right away.
+
+If the API does not send per-endpoint intervals, `lastScanAt` or `scanNow` (older API versions), every endpoint is scanned on the local interval, as before.
+
+`nextScan` in `/healthz` is the earliest time any endpoint becomes due (now, while a `scanNow` request is waiting).
+
 ## CLI Flags
 
 ```
@@ -137,7 +160,7 @@ Use the `sni` field when the hostname you connect to differs from the hostname e
 | `KK_PROBE_NAME` | | Human-friendly probe name |
 | `KK_PROBE_MODE` | `standalone` | `standalone`, `connected`, or `hosted` |
 | `KK_PROBE_REGION` | | Geographic region label (required for `hosted` mode) |
-| `KK_PROBE_INTERVAL` | `60m` | Scan interval (Go duration, e.g. `30m`, `1h`) |
+| `KK_PROBE_INTERVAL` | `60m` | Scan interval (Go duration, e.g. `30m`, `1h`). In `connected` and `hosted` modes the API can set a per-endpoint interval; see [Scan Intervals](#scan-intervals) |
 | `KK_PROBE_TIMEOUT` | `10s` | Per-endpoint TLS dial timeout |
 | `KK_PROBE_STATE_FILE` | `/var/lib/krakenkey-probe/state.json` | State file path |
 | `KK_PROBE_ENDPOINTS` | | Comma-separated `host:port` pairs. Port defaults to `443` if omitted. |
@@ -294,7 +317,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o krakenkey-pr
 1. On startup, the probe loads its config and generates or reads its probe ID. In `connected`/`hosted` modes, it registers with the KrakenKey API.
 2. It immediately runs the first scan cycle: connects to each endpoint via TLS and extracts certificate metadata. In `connected`/`hosted` modes, results are sent to the API. In `standalone` mode, results are logged to the console.
 3. After the first scan, the `/readyz` endpoint returns `200 OK`.
-4. Subsequent scans run on the configured interval.
+4. Subsequent scans run on the configured interval in `standalone` mode, and per endpoint in `connected`/`hosted` modes (see [Scan Intervals](#scan-intervals)).
 5. On `SIGINT` or `SIGTERM`, the probe finishes the current scan cycle and shuts down gracefully.
 
 ### What Gets Collected
@@ -438,7 +461,7 @@ The endpoint is not reachable from the probe's network. Check firewall rules, DN
 The endpoint is not responding within the configured timeout. Increase `KK_PROBE_TIMEOUT` or check network connectivity.
 
 **"API rate limited (HTTP 429)"**
-The probe is sending reports too frequently. Increase `KK_PROBE_INTERVAL`.
+The probe is sending requests too frequently. Increase `KK_PROBE_INTERVAL`. In `connected` mode, all API keys on your account share one rate limit bucket, and each probe fetches its config once a minute.
 
 **Probe ID keeps changing**
 Ensure the state file path is persistent across restarts. When using Docker, mount a volume to `/var/lib/krakenkey-probe`.

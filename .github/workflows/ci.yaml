@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
+          check-latest: true
       - uses: golangci/golangci-lint-action@v9
         with:
           version: latest
@@ -30,6 +31,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
+          check-latest: true
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - run: go test ./... -race -coverprofile=coverage.out -covermode=atomic
@@ -51,4 +53,5 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
+          check-latest: true
       - run: CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o /dev/null ./cmd/probe

@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The packages install a `krakenkey-probe.service` systemd unit that runs as a new `krakenkey-probe` system user with a hardened sandbox and keeps its state in `/var/lib/krakenkey-probe`
 - Default config at `/etc/krakenkey/probe.yaml` (standalone mode, mode `0640`, `root:krakenkey-probe`), kept on upgrade. The service is not enabled or started on install; edit the config, then run `sudo systemctl enable --now krakenkey-probe`
 - README: "Install from .deb/.rpm" section
+- Per-endpoint scan intervals in `connected` and `hosted` modes. The probe reads an optional `interval` for each endpoint in the `GET /probes/:probeId/config` response and scans each endpoint on its own schedule instead of scanning everything on the local interval. Hosted probes use the API value; connected probes treat it as a floor and use the slower of it and the local interval. Missing or invalid values fall back to the local interval; values are clamped to `1m`..`24h`
+- Connected and hosted probes read the optional `lastScanAt` for each endpoint and use it as the last scan time for endpoints they have not scanned since starting, so a restart no longer rescans everything at once and then leaves a gap of almost two intervals. For an endpoint listed more than once the earliest value is used, and a missing or invalid value means the endpoint is scanned right away
+- Connected and hosted probes honor `scanNow` for each endpoint: a user-requested scan runs on the next 30 second check, once per request
+- README: "Scan Intervals" section
+
+### Changed
+
+- In `connected` and `hosted` modes the probe checks every 30 seconds which endpoints are due and scans and reports only those. A config change now scans only the new or changed endpoints instead of all of them, and an endpoint listed more than once (same host, port and SNI) is scanned once per cycle instead of once per listing
+- `nextScan` in `/healthz` is the earliest time any endpoint is due in `connected` and `hosted` modes
+
+### Build
+
+- `actions/setup-go` uses `check-latest: true`, so CI and release builds use the newest Go 1.26 patch release instead of whatever the runner has cached (the cached 1.26.8 failed `govulncheck` on stdlib fixes in 1.26.9)
 
 ## [0.3.1] - 2026-10-05
 

@@ -27,6 +27,11 @@ probe:
   region: ""                             # KK_PROBE_REGION
 
   # How often to scan endpoints (Go duration). Min: 1m, Max: 24h. Default: 60m.
+  # standalone: every endpoint is scanned on this interval.
+  # connected: the API sends the shortest interval your plan allows for each
+  #   endpoint; the probe uses the slower of that and this value.
+  # hosted: the per-endpoint interval from the API is used; this value is the
+  #   fallback when the API does not send one.
   interval: "60m"                        # KK_PROBE_INTERVAL
 
   # TLS dial timeout per endpoint. Default: 10s.
